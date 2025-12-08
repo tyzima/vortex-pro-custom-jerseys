@@ -179,6 +179,16 @@ export const VisualEditor: React.FC = () => {
 
   const sports = Object.values(SPORTS_LIBRARY);
 
+  console.log('VisualEditor - SPORTS_LIBRARY:', SPORTS_LIBRARY);
+  console.log('VisualEditor - sports array:', sports);
+  if (selectedContext) {
+    console.log('VisualEditor - selectedContext:', selectedContext);
+    console.log('VisualEditor - selectedContext.cut:', selectedContext.cut);
+    if (selectedContext.template) {
+      console.log('VisualEditor - selectedContext.template.layers:', selectedContext.template.layers);
+    }
+  }
+
   return (
     <div className="flex h-screen bg-black text-white">
       {/* LEFT SIDEBAR - Navigation */}

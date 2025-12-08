@@ -229,12 +229,16 @@ export async function getSportDefinition(sportSlug: string): Promise<SportDefini
     };
   });
 
-  return {
+  const result = {
     id: sport.slug,
     label: sport.label,
     cuts: cutsMap,
     templates: designTemplates
   };
+
+  console.log(`getSportDefinition(${sportSlug}) result:`, JSON.stringify(result, null, 2));
+
+  return result;
 }
 
 export async function getTemplateLibrary(): Promise<Record<string, SportDefinition>> {
