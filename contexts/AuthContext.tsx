@@ -66,6 +66,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!error && data) {
       setProfile(data);
+    } else if (!error && !data) {
+      console.log('Profile not found, creating...');
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: userData.user.email || '',
+            role: 'customer',
+            full_name: userData.user.user_metadata?.full_name || '',
+          })
+          .select()
+          .single();
+
+        if (!createError && newProfile) {
+          setProfile(newProfile);
+        }
+      }
     } else if (error) {
       console.error('Error fetching profile:', error);
     }
