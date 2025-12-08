@@ -43,6 +43,13 @@ const AppContent = () => {
     localStorage.setItem('vortex_cart', JSON.stringify(cart));
   }, [cart]);
 
+  // Redirect from auth page after successful login
+  useEffect(() => {
+    if (user && view === 'auth') {
+      setView('home');
+    }
+  }, [user, view]);
+
   const closeOverlay = () => setActiveOverlay(null);
 
   // Cart Handlers
