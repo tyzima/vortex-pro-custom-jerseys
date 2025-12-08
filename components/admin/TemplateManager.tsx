@@ -612,13 +612,13 @@ const TemplateEditor: React.FC<{
                 }`}
               >
                 <div className="font-bold text-white text-sm mb-2">{cutData.label}</div>
-                <div className="aspect-square bg-black rounded overflow-hidden p-2">
-                  <svg viewBox="0 0 400 500" className="w-full h-full">
+                <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded overflow-hidden p-3">
+                  <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-md">
                     <path
                       d={cutData.jersey.shape.front}
-                      fill="#1a1a1a"
-                      stroke="#333"
-                      strokeWidth="1"
+                      fill="#2a2a2a"
+                      stroke="#1a1a1a"
+                      strokeWidth="2"
                     />
                   </svg>
                 </div>
@@ -628,27 +628,27 @@ const TemplateEditor: React.FC<{
         </div>
 
         {/* Center - Canvas Preview */}
-        <div className="flex-1 flex flex-col bg-gradient-to-br from-neutral-950 to-black">
-          <div className="p-4 border-b border-neutral-800/50">
-            <h3 className="font-bold uppercase text-sm text-neutral-400 text-center">
+        <div className="flex-1 flex flex-col bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
+          <div className="p-4 border-b border-neutral-700/50 bg-black/20">
+            <h3 className="font-bold uppercase text-sm text-neutral-300 text-center">
               Customer Preview - Step 2: Template Design
             </h3>
           </div>
 
           <div className="flex-1 p-8 flex items-center justify-center">
-            <div className="relative" style={{ width: '600px', maxWidth: '100%' }}>
+            <div className="relative bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded-2xl p-8 shadow-2xl" style={{ width: '700px', maxWidth: '100%' }}>
               {/* Jersey and Shorts Side by Side */}
               <div className="grid grid-cols-2 gap-8">
                 {/* JERSEY */}
                 <div>
-                  <div className="text-center text-xs font-bold text-neutral-500 uppercase mb-2">Jersey</div>
-                  <svg viewBox="0 0 400 500" className="w-full drop-shadow-2xl">
+                  <div className="text-center text-xs font-bold text-neutral-600 uppercase mb-3">Jersey</div>
+                  <svg viewBox="0 0 400 500" className="w-full drop-shadow-xl">
                     {/* Jersey Base Shape */}
                     {cut?.jersey.shape[viewSide] && (
                       <path
                         d={cut.jersey.shape[viewSide]}
                         fill={previewColors.secondary}
-                        stroke="#000"
+                        stroke="#1a1a1a"
                         strokeWidth="2"
                       />
                     )}
@@ -679,14 +679,14 @@ const TemplateEditor: React.FC<{
 
                 {/* SHORTS */}
                 <div>
-                  <div className="text-center text-xs font-bold text-neutral-500 uppercase mb-2">Shorts</div>
-                  <svg viewBox="0 0 400 500" className="w-full drop-shadow-2xl">
+                  <div className="text-center text-xs font-bold text-neutral-600 uppercase mb-3">Shorts</div>
+                  <svg viewBox="0 0 400 500" className="w-full drop-shadow-xl">
                     {/* Shorts Base Shape */}
                     {cut?.shorts.shape[viewSide] && (
                       <path
                         d={cut.shorts.shape[viewSide]}
                         fill={previewColors.secondary}
-                        stroke="#000"
+                        stroke="#1a1a1a"
                         strokeWidth="2"
                       />
                     )}
