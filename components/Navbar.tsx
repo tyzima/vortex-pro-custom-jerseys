@@ -44,10 +44,10 @@ export const Navbar: React.FC<NavbarProps & { currentView: string }> = ({
 
   return (
     <nav className="fixed top-0 left-0 w-full z-50 bg-brand-black/90 backdrop-blur-md border-b border-brand-border transition-all duration-300">
-      <div className="w-full px-6 h-20 flex items-center justify-between">
-        {/* Logo */}
+      <div className="w-full px-6 h-20 flex items-center">
+        {/* Logo - Fixed width */}
         <div
-          className="flex items-center gap-3 cursor-pointer group"
+          className="flex items-center gap-3 cursor-pointer group flex-shrink-0"
           onClick={onHomeClick}
         >
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="group-hover:rotate-180 transition-transform duration-700">
@@ -57,16 +57,16 @@ export const Navbar: React.FC<NavbarProps & { currentView: string }> = ({
           <span className="font-display text-2xl text-brand-white italic tracking-wider group-hover:text-brand-accent transition-colors">ARRIX</span>
         </div>
 
-        {/* Desktop Navigation - Centered */}
-        <div className="hidden lg:flex items-center gap-12 absolute left-1/2 transform -translate-x-1/2">
+        {/* Desktop Navigation - Centered with flex-grow */}
+        <div className="hidden lg:flex items-center justify-center gap-8 xl:gap-12 flex-grow">
           <NavLink label="How It Works" onClick={() => onMenuClick('how-it-works')} />
           <NavLink label="Team Packs" onClick={() => onMenuClick('team-packs')} />
           <NavLink label="Fabrics" onClick={() => onMenuClick('fabrics')} />
           <NavLink label="Tournaments" onClick={() => onMenuClick('tournaments')} />
         </div>
 
-        {/* Right Side Actions */}
-        <div className="flex items-center gap-8">
+        {/* Right Side Actions - Fixed width */}
+        <div className="flex items-center gap-4 xl:gap-8 flex-shrink-0">
           {/* Icons Group */}
           <div className={`flex items-center gap-6 ${currentView === 'builder' ? '' : 'border-r border-brand-border pr-8'}`}>
             <button
