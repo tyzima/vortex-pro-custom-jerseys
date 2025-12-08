@@ -4,9 +4,10 @@ import { LibraryViewer, EditContext } from './LibraryViewer';
 import { TemplateBuilder } from './TemplateBuilder';
 import { OrdersOverview } from './OrdersOverview';
 import { TemplateManager } from './TemplateManager';
+import { ProductManager } from './ProductManager';
 
 export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
-  const [tab, setTab] = useState<'orders' | 'library' | 'builder' | 'templates'>('templates');
+  const [tab, setTab] = useState<'orders' | 'library' | 'builder' | 'templates' | 'products'>('templates');
   const [editContext, setEditContext] = useState<EditContext | null>(null);
 
   const handleEdit = (context: EditContext) => {
@@ -45,12 +46,20 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
             <ShoppingBag size={14} /> Orders
           </button>
           <button
+            onClick={() => setTab('products')}
+            className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${
+              tab === 'products' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <Package size={14} /> Products
+          </button>
+          <button
             onClick={() => setTab('templates')}
             className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${
               tab === 'templates' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <Package size={14} /> Products & Templates
+            <Palette size={14} /> Templates
           </button>
           <button
             onClick={() => setTab('library')}
@@ -68,6 +77,8 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
           <div className="h-full max-w-7xl mx-auto flex flex-col p-6">
             <OrdersOverview />
           </div>
+        ) : tab === 'products' ? (
+          <ProductManager />
         ) : tab === 'templates' ? (
           <TemplateManager />
         ) : tab === 'library' ? (
