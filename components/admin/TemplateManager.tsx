@@ -22,15 +22,18 @@ import {
   Maximize2
 } from 'lucide-react';
 import { useTemplateLibrary } from '../../contexts/TemplateLibraryContext';
-import { Template, Sport, ProductCut } from '../../types';
+import { Template, SportDefinition, ProductCut } from '../../types';
 import { createTemplate } from '../../lib/templateService';
+
+type Sport = SportDefinition;
 import { CanvasViewer } from './CanvasViewer';
+import { ProductDesignCanvas } from './ProductDesignCanvas';
 
 type ViewMode = 'gallery' | 'list';
 type TemplateViewMode = 'grid' | 'canvas';
 type EditorMode = 'view' | 'edit' | null;
 type ViewSide = 'front' | 'back';
-type PageView = 'products' | 'templates';
+type PageView = 'products' | 'templates' | 'design-canvas';
 
 interface TemplateWithSport extends Template {
   sport: Sport;
@@ -159,7 +162,7 @@ export const TemplateManager: React.FC = () => {
 
   const handleSelectProduct = (sportId: string, sportLabel: string, cutSlug: string, cutLabel: string, garmentType: 'jersey' | 'shorts', cut: ProductCut) => {
     setSelectedProduct({ sportId, sportLabel, cutSlug, cutLabel, garmentType, cut });
-    setPageView('templates');
+    setPageView('design-canvas');
   };
 
   const handleBackToProducts = () => {
@@ -202,6 +205,24 @@ export const TemplateManager: React.FC = () => {
         onSelectProduct={handleSelectProduct}
       />
     );
+  }
+
+  if (pageView === 'design-canvas' && selectedProduct && SPORTS_LIBRARY) {
+    const sportData = SPORTS_LIBRARY[selectedProduct.sportId];
+    if (sportData) {
+      return (
+        <ProductDesignCanvas
+          sport={{
+            id: selectedProduct.sportId,
+            label: selectedProduct.sportLabel,
+            cuts: sportData.cuts,
+            templates: sportData.templates
+          }}
+          garmentType={selectedProduct.garmentType}
+          onBack={handleBackToProducts}
+        />
+      );
+    }
   }
 
   return (

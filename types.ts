@@ -122,6 +122,9 @@ export interface SportDefinition {
   templates: DesignTemplate[];      // List of available visual designs
 }
 
+// Legacy Template type alias for backwards compatibility
+export type Template = DesignTemplate;
+
 export const COLORS: ColorOption[] = [
   { name: 'Midnight Black', hex: '#0a0a0a' },
   { name: 'Anthracite', hex: '#333333' },
