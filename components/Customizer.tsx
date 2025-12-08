@@ -1668,7 +1668,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                                     onChange={(e) => handleLogoUpdate(selectedItemId, 'size', parseInt(e.target.value))}
                                                     className="w-full h-1 bg-brand-gray rounded-lg appearance-none cursor-pointer accent-brand-accent"
                                                 />
-                                                <span className="text-[8px] font-bold text-white">L</span>
+                                                <span className="text-[8px] font-bold text-brand-white">L</span>
                                             </div>
                                         </Tooltip>
 
@@ -1684,7 +1684,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                                     onChange={(e) => handleLogoUpdate(selectedItemId, 'rotation', parseInt(e.target.value))}
                                                     className="w-full h-1 bg-brand-gray rounded-lg appearance-none cursor-pointer accent-brand-accent"
                                                 />
-                                                <span className="text-[8px] font-bold text-white">+180°</span>
+                                                <span className="text-[8px] font-bold text-brand-white">+180°</span>
                                             </div>
                                         </Tooltip>
 
@@ -1726,7 +1726,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                                     // @ts-ignore
                                                     // @ts-ignore
                                                     onClick={() => setActivePopover(activePopover === 'font' ? null : 'font')}
-                                                    className="text-[10px] font-bold text-white hover:text-brand-accent uppercase w-16 text-center truncate"
+                                                    className="text-[10px] font-bold text-brand-white hover:text-brand-accent uppercase w-16 text-center truncate"
                                                     // @ts-ignore
                                                     style={{ fontFamily: design.textElements.find(t => t.id === selectedItemId)?.font }}
                                                 >
@@ -1770,7 +1770,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                                     onChange={(e) => handleTextUpdate(selectedItemId, 'size', parseInt(e.target.value))}
                                                     className="w-full h-1 bg-brand-gray rounded-lg appearance-none cursor-pointer accent-brand-accent"
                                                 />
-                                                <span className="text-[8px] font-bold text-white">AA</span>
+                                                <span className="text-[8px] font-bold text-brand-white">AA</span>
                                             </div>
                                         </Tooltip>
 
@@ -1847,7 +1847,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                             <div className="flex items-center gap-2 border-l border-brand-border pl-3 relative">
                                                 <button
                                                     onClick={() => setActivePopover(activePopover === 'patternType' ? null : 'patternType')}
-                                                    className="text-[10px] font-bold text-white hover:text-brand-accent uppercase w-20 text-center truncate"
+                                                    className="text-[10px] font-bold text-brand-white hover:text-brand-accent uppercase w-20 text-center truncate"
                                                 >
                                                     {design.zones[selectedItemId]?.pattern || 'Solid'}
                                                 </button>
@@ -1920,7 +1920,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                 )}
 
                                 {/* Close Button */}
-                                <button onClick={() => setSelectedItemId(null)} className="ml-2 text-neutral-500 hover:text-white transition-colors">
+                                <button onClick={() => setSelectedItemId(null)} className="ml-2 text-neutral-500 hover:text-brand-white transition-colors">
                                     <X size={14} />
                                 </button>
                             </div>
