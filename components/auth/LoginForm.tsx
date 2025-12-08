@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { LogIn, User, Lock, AlertCircle } from 'lucide-react';
+import { LogIn, User, Lock, CircleAlert as AlertCircle } from 'lucide-react';
 
 interface LoginFormProps {
   onSwitchToSignup: () => void;
