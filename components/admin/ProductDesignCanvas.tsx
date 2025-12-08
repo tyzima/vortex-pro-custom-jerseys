@@ -15,7 +15,6 @@ import {
   RotateCcw,
   Upload,
   Save,
-  Settings,
   Shirt,
   Scissors,
   X,
@@ -604,6 +603,13 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
             </span>
             <span className="text-neutral-500">-</span>
             <span className="text-neutral-400">{sport.label}</span>
+            <button
+              onClick={openProductDetailsModal}
+              className="ml-1 p-1.5 text-neutral-500 hover:text-brand-accent hover:bg-neutral-800 rounded transition-colors"
+              title="Edit Product Details"
+            >
+              <Edit3 size={14} />
+            </button>
           </div>
           {isDirty && (
             <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">
@@ -1086,19 +1092,12 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
               <select
                 value={selectedCutSlug}
                 onChange={(e) => setSelectedCutSlug(e.target.value)}
-                className="flex-1 px-3 py-2 bg-black border border-neutral-700 rounded text-sm text-white cursor-pointer"
+                className="w-full px-3 py-2 bg-black border border-neutral-700 rounded text-sm text-white cursor-pointer"
               >
                 {Object.entries(sport.cuts).map(([slug, cut]) => (
                   <option key={slug} value={slug}>{cut.label}</option>
                 ))}
               </select>
-              <button
-                onClick={openProductDetailsModal}
-                className="p-2 hover:bg-neutral-800 rounded"
-                title="Product Settings"
-              >
-                <Settings size={16} className="text-neutral-400" />
-              </button>
             </div>
           </div>
         </div>
