@@ -487,6 +487,9 @@ const TemplateCard: React.FC<{
             <Layers size={12} />
             <span>{template.layers.length} layers</span>
           </div>
+          <div className="px-2 py-1 bg-neutral-800 rounded text-neutral-300 capitalize">
+            {Object.keys(template.sport.cuts)[0]}
+          </div>
         </div>
       </div>
     </div>
@@ -530,7 +533,12 @@ const TemplateListItem: React.FC<{
       {/* Info */}
       <div className="flex-1">
         <h3 className="font-bold text-white text-lg">{template.label}</h3>
-        <p className="text-sm text-neutral-400">{template.sport.label} • {template.layers.length} layers</p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-sm text-neutral-400">{template.sport.label} • {template.layers.length} layers</p>
+          <span className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 capitalize">
+            {Object.keys(template.sport.cuts)[0]}
+          </span>
+        </div>
       </div>
 
       {/* Actions */}
