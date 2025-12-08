@@ -39,6 +39,7 @@ interface SelectedProduct {
   sportLabel: string;
   cutSlug: string;
   cutLabel: string;
+  garmentType: 'jersey' | 'shorts';
   cut: ProductCut;
 }
 
@@ -152,8 +153,8 @@ export const TemplateManager: React.FC = () => {
     }
   };
 
-  const handleSelectProduct = (sportId: string, sportLabel: string, cutSlug: string, cutLabel: string, cut: ProductCut) => {
-    setSelectedProduct({ sportId, sportLabel, cutSlug, cutLabel, cut });
+  const handleSelectProduct = (sportId: string, sportLabel: string, cutSlug: string, cutLabel: string, garmentType: 'jersey' | 'shorts', cut: ProductCut) => {
+    setSelectedProduct({ sportId, sportLabel, cutSlug, cutLabel, garmentType, cut });
     setPageView('templates');
   };
 
@@ -218,11 +219,11 @@ export const TemplateManager: React.FC = () => {
                   <h1 className="text-3xl font-bold uppercase text-white">Design Templates</h1>
                   {selectedProduct && (
                     <span className="px-3 py-1 bg-brand-accent/20 text-brand-accent text-sm font-bold uppercase rounded-full border border-brand-accent/30">
-                      {selectedProduct.sportLabel} • {selectedProduct.cutLabel}
+                      {selectedProduct.cutLabel} {selectedProduct.garmentType === 'jersey' ? 'Jersey' : 'Shorts'} • {selectedProduct.sportLabel}
                     </span>
                   )}
                 </div>
-                <p className="text-neutral-400">Browse templates for this product</p>
+                <p className="text-neutral-400">Browse design templates for this product</p>
               </div>
             </div>
             <button
@@ -1054,7 +1055,7 @@ const ProductGalleryView: React.FC<{
   setSearchQuery: (query: string) => void;
   selectedSport: string;
   setSelectedSport: (sport: string) => void;
-  onSelectProduct: (sportId: string, sportLabel: string, cutSlug: string, cutLabel: string, cut: ProductCut) => void;
+  onSelectProduct: (sportId: string, sportLabel: string, cutSlug: string, cutLabel: string, garmentType: 'jersey' | 'shorts', cut: ProductCut) => void;
 }> = ({ SPORTS_LIBRARY, searchQuery, setSearchQuery, selectedSport, setSelectedSport, onSelectProduct }) => {
 
   const allProducts = useMemo(() => {
@@ -1065,20 +1066,45 @@ const ProductGalleryView: React.FC<{
       sportLabel: string;
       cutSlug: string;
       cutLabel: string;
+      garmentType: 'jersey' | 'shorts';
       cut: ProductCut;
       templateCount: number;
+      price: number;
+      description: string;
     }> = [];
 
     Object.entries(SPORTS_LIBRARY).forEach(([sportId, sport]) => {
       Object.entries(sport.cuts).forEach(([cutSlug, cut]) => {
-        products.push({
-          sportId,
-          sportLabel: sport.label,
-          cutSlug,
-          cutLabel: cut.label,
-          cut,
-          templateCount: sport.templates.length
-        });
+        const hasJersey = !!(cut.jersey.shape.front || cut.jersey.shape.back);
+        const hasShorts = !!(cut.shorts.shape.front || cut.shorts.shape.back);
+
+        if (hasJersey) {
+          products.push({
+            sportId,
+            sportLabel: sport.label,
+            cutSlug,
+            cutLabel: cut.label,
+            garmentType: 'jersey',
+            cut,
+            templateCount: sport.templates.length,
+            price: 49.99,
+            description: `Premium ${cut.label.toLowerCase()} jersey with moisture-wicking fabric and professional fit.`
+          });
+        }
+
+        if (hasShorts) {
+          products.push({
+            sportId,
+            sportLabel: sport.label,
+            cutSlug,
+            cutLabel: cut.label,
+            garmentType: 'shorts',
+            cut,
+            templateCount: sport.templates.length,
+            price: 34.99,
+            description: `High-performance ${cut.label.toLowerCase()} shorts with breathable fabric and comfort fit.`
+          });
+        }
       });
     });
 
@@ -1091,7 +1117,8 @@ const ProductGalleryView: React.FC<{
     if (searchQuery) {
       filtered = filtered.filter(p =>
         p.sportLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.cutLabel.toLowerCase().includes(searchQuery.toLowerCase())
+        p.cutLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.garmentType.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -1169,13 +1196,14 @@ const ProductGalleryView: React.FC<{
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProducts.map(product => (
               <ProductCard
-                key={`${product.sportId}-${product.cutSlug}`}
+                key={`${product.sportId}-${product.cutSlug}-${product.garmentType}`}
                 product={product}
                 onSelect={() => onSelectProduct(
                   product.sportId,
                   product.sportLabel,
                   product.cutSlug,
                   product.cutLabel,
+                  product.garmentType,
                   product.cut
                 )}
               />
@@ -1193,109 +1221,79 @@ const ProductCard: React.FC<{
     sportLabel: string;
     cutSlug: string;
     cutLabel: string;
+    garmentType: 'jersey' | 'shorts';
     cut: ProductCut;
     templateCount: number;
+    price: number;
+    description: string;
   };
   onSelect: () => void;
 }> = ({ product, onSelect }) => {
-  const hasJersey = !!(product.cut.jersey.shape.front || product.cut.jersey.shape.back);
-  const hasShorts = !!(product.cut.shorts.shape.front || product.cut.shorts.shape.back);
+  const isJersey = product.garmentType === 'jersey';
+  const shape = isJersey ? product.cut.jersey.shape : product.cut.shorts.shape;
+  const trim = isJersey ? product.cut.jersey.trim : product.cut.shorts.trim;
 
   return (
     <button
       onClick={onSelect}
       className="group bg-black border border-neutral-800 rounded-xl overflow-hidden hover:border-brand-accent transition-all hover:shadow-lg hover:shadow-brand-accent/20 text-left w-full"
     >
-      {/* Preview Grid */}
-      <div className="grid grid-cols-2 gap-2 p-4 bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
-        {/* Jersey */}
-        <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded-lg p-4 flex items-center justify-center">
-          {hasJersey ? (
-            <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-md">
-              <path
-                d={product.cut.jersey.shape.front}
-                fill="#2a2a2a"
-                stroke="#1a1a1a"
-                strokeWidth="2"
-              />
-              {product.cut.jersey.trim.front && (
-                <path
-                  d={product.cut.jersey.trim.front}
-                  fill="none"
-                  stroke="#D2F802"
-                  strokeWidth="3"
-                />
-              )}
-            </svg>
-          ) : (
-            <div className="text-center">
-              <Shirt size={32} className="mx-auto text-neutral-400 opacity-30" />
-            </div>
+      {/* Preview */}
+      <div className="aspect-[4/5] bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 p-8 flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-xl relative z-10">
+          <path
+            d={shape.front}
+            fill="#2a2a2a"
+            stroke="#1a1a1a"
+            strokeWidth="2"
+          />
+          {trim.front && (
+            <path
+              d={trim.front}
+              fill="none"
+              stroke={isJersey ? "#D2F802" : "#22c55e"}
+              strokeWidth="3"
+            />
           )}
-        </div>
-
-        {/* Shorts */}
-        <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded-lg p-4 flex items-center justify-center">
-          {hasShorts ? (
-            <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-md">
-              <path
-                d={product.cut.shorts.shape.front}
-                fill="#2a2a2a"
-                stroke="#1a1a1a"
-                strokeWidth="2"
-              />
-              {product.cut.shorts.trim.front && (
-                <path
-                  d={product.cut.shorts.trim.front}
-                  fill="none"
-                  stroke="#22c55e"
-                  strokeWidth="3"
-                />
-              )}
-            </svg>
-          ) : (
-            <div className="text-center">
-              <Scissors size={32} className="mx-auto text-neutral-400 opacity-30" />
-            </div>
-          )}
-        </div>
+        </svg>
       </div>
 
       {/* Info */}
       <div className="p-4 border-t border-neutral-800">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="font-bold text-white text-lg uppercase">{product.cutLabel}</h3>
-            <p className="text-sm text-neutral-400">{product.sportLabel}</p>
+        <div className="flex items-center gap-2 mb-2">
+          {isJersey ? (
+            <Shirt size={16} className="text-brand-accent" />
+          ) : (
+            <Scissors size={16} className="text-green-500" />
+          )}
+          <span className="text-xs font-bold text-neutral-500 uppercase">
+            {product.sportLabel}
+          </span>
+        </div>
+
+        <h3 className="font-bold text-white text-xl mb-2 uppercase leading-tight">
+          {product.cutLabel} {isJersey ? 'Jersey' : 'Shorts'}
+        </h3>
+
+        <p className="text-sm text-neutral-400 mb-3 line-clamp-2">
+          {product.description}
+        </p>
+
+        <div className="flex items-center justify-between pt-3 border-t border-neutral-800">
+          <div className="text-2xl font-bold text-brand-accent">
+            ${product.price.toFixed(2)}
           </div>
-          <ChevronLeft size={20} className="text-neutral-600 group-hover:text-brand-accent transition-colors rotate-180" />
+          <div className="text-xs text-neutral-500">
+            {product.templateCount} design{product.templateCount !== 1 ? 's' : ''}
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs">
-          {hasJersey && (
-            <div className="flex items-center gap-1 text-brand-accent">
-              <Shirt size={12} />
-              <span>Jersey</span>
-            </div>
-          )}
-          {hasShorts && (
-            <div className="flex items-center gap-1 text-green-500">
-              <Scissors size={12} />
-              <span>Shorts</span>
-            </div>
-          )}
-          {!hasJersey && !hasShorts && (
-            <span className="text-red-500">No data</span>
-          )}
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-neutral-800 flex items-center justify-between text-xs">
-          <span className="text-neutral-500">
-            {product.templateCount} {product.templateCount === 1 ? 'template' : 'templates'}
-          </span>
-          <span className="text-brand-accent font-bold uppercase group-hover:underline">
-            Browse →
-          </span>
+        <div className="mt-3">
+          <div className="flex items-center justify-center gap-2 text-brand-accent font-bold uppercase text-sm group-hover:gap-3 transition-all">
+            <span>Choose Design</span>
+            <ChevronLeft size={16} className="rotate-180" />
+          </div>
         </div>
       </div>
     </button>
