@@ -19,7 +19,8 @@ import {
   Shirt,
   Scissors,
   Package,
-  Maximize2
+  Maximize2,
+  Sparkles
 } from 'lucide-react';
 import { useTemplateLibrary } from '../../contexts/TemplateLibraryContext';
 import { Template, SportDefinition, ProductCut } from '../../types';
@@ -1115,6 +1116,7 @@ const ProductGalleryView: React.FC<{
   setSelectedSport: (sport: string) => void;
   onSelectProduct: (sportId: string, sportLabel: string, cutSlug: string, cutLabel: string, garmentType: 'jersey' | 'shorts', cut: ProductCut) => void;
 }> = ({ SPORTS_LIBRARY, searchQuery, setSearchQuery, selectedSport, setSelectedSport, onSelectProduct }) => {
+  const [garmentFilter, setGarmentFilter] = useState<'all' | 'jersey' | 'shorts'>('all');
 
   const allProducts = useMemo(() => {
     if (!SPORTS_LIBRARY) return [];
@@ -1184,90 +1186,160 @@ const ProductGalleryView: React.FC<{
       filtered = filtered.filter(p => p.sportId === selectedSport);
     }
 
+    if (garmentFilter !== 'all') {
+      filtered = filtered.filter(p => p.garmentType === garmentFilter);
+    }
+
     return filtered;
-  }, [allProducts, searchQuery, selectedSport]);
+  }, [allProducts, searchQuery, selectedSport, garmentFilter]);
+
+  const sportCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: allProducts.length };
+    allProducts.forEach(p => {
+      counts[p.sportId] = (counts[p.sportId] || 0) + 1;
+    });
+    return counts;
+  }, [allProducts]);
 
   return (
     <div className="h-full bg-neutral-950 flex flex-col">
-      {/* HEADER */}
-      <div className="border-b border-neutral-800 bg-black">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold uppercase text-white">Product Catalog</h1>
-              <p className="text-neutral-400 mt-1">Select a product to browse design templates</p>
-            </div>
-          </div>
-
-          {/* TOOLBAR */}
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Search */}
-            <div className="flex-1 min-w-[300px] relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:border-brand-accent outline-none transition-colors"
-              />
+      <div className="border-b border-neutral-800 bg-gradient-to-b from-neutral-900 to-black">
+        <div className="p-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-start justify-between mb-8">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-1 h-8 bg-brand-accent rounded-full" />
+                  <h1 className="text-4xl font-black uppercase tracking-tight text-white">
+                    Product Catalog
+                  </h1>
+                </div>
+                <p className="text-neutral-400 ml-4">
+                  Browse our collection and select a product to customize
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-black text-brand-accent">{filteredProducts.length}</div>
+                <div className="text-xs text-neutral-500 uppercase tracking-widest">Products</div>
+              </div>
             </div>
 
-            {/* Sport Filter */}
-            <select
-              value={selectedSport}
-              onChange={(e) => setSelectedSport(e.target.value)}
-              className="px-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:border-brand-accent outline-none cursor-pointer"
-            >
-              <option value="all">All Sports</option>
-              {SPORTS_LIBRARY && Object.entries(SPORTS_LIBRARY).map(([id, sport]) => (
-                <option key={id} value={id}>{sport.label}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex-1 min-w-[320px] relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" size={20} />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3.5 bg-black/50 border border-neutral-800 rounded-xl text-white placeholder-neutral-600 focus:border-brand-accent focus:ring-1 focus:ring-brand-accent/30 outline-none transition-all text-sm"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 p-1 bg-black/50 border border-neutral-800 rounded-xl">
+                <button
+                  onClick={() => setGarmentFilter('all')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${
+                    garmentFilter === 'all'
+                      ? 'bg-brand-accent text-black'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setGarmentFilter('jersey')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase flex items-center gap-1.5 transition-all ${
+                    garmentFilter === 'jersey'
+                      ? 'bg-brand-accent text-black'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  <Shirt size={14} />
+                  Jerseys
+                </button>
+                <button
+                  onClick={() => setGarmentFilter('shorts')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold uppercase flex items-center gap-1.5 transition-all ${
+                    garmentFilter === 'shorts'
+                      ? 'bg-brand-accent text-black'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  <Scissors size={14} />
+                  Shorts
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Stats Bar */}
-        <div className="px-6 py-3 bg-neutral-900/50 border-t border-neutral-800 flex items-center gap-6 text-sm">
-          <span className="text-neutral-400">
-            <span className="text-white font-bold">{filteredProducts.length}</span> products
-          </span>
-          {selectedSport !== 'all' && SPORTS_LIBRARY && (
-            <span className="text-neutral-400">
-              in <span className="text-brand-accent font-bold">{SPORTS_LIBRARY[selectedSport]?.label}</span>
-            </span>
-          )}
+        <div className="px-8 py-3 bg-black/30 border-t border-neutral-800/50">
+          <div className="max-w-7xl mx-auto flex items-center gap-3 overflow-x-auto pb-1 scrollbar-hide">
+            <button
+              onClick={() => setSelectedSport('all')}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase whitespace-nowrap transition-all ${
+                selectedSport === 'all'
+                  ? 'bg-white text-black'
+                  : 'bg-neutral-800/50 text-neutral-400 hover:bg-neutral-800 hover:text-white'
+              }`}
+            >
+              All Sports ({sportCounts.all})
+            </button>
+            {SPORTS_LIBRARY && Object.entries(SPORTS_LIBRARY).map(([id, sport]) => (
+              <button
+                key={id}
+                onClick={() => setSelectedSport(id)}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase whitespace-nowrap transition-all ${
+                  selectedSport === id
+                    ? 'bg-white text-black'
+                    : 'bg-neutral-800/50 text-neutral-400 hover:bg-neutral-800 hover:text-white'
+                }`}
+              >
+                {sport.label} ({sportCounts[id] || 0})
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* CONTENT */}
-      <div className="flex-1 overflow-auto p-6">
-        {filteredProducts.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center">
-              <Package className="w-16 h-16 mx-auto mb-4 text-neutral-700" />
-              <h3 className="text-xl font-bold text-neutral-600 mb-2">No products found</h3>
-              <p className="text-neutral-500">Try adjusting your search or filters</p>
+      <div className="flex-1 overflow-auto p-8">
+        <div className="max-w-7xl mx-auto">
+          {filteredProducts.length === 0 ? (
+            <div className="h-[60vh] flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-neutral-900 flex items-center justify-center">
+                  <Package className="w-12 h-12 text-neutral-700" />
+                </div>
+                <h3 className="text-2xl font-bold text-neutral-500 mb-2">No products found</h3>
+                <p className="text-neutral-600 mb-6">Try adjusting your search or filters</p>
+                <button
+                  onClick={() => { setSearchQuery(''); setSelectedSport('all'); setGarmentFilter('all'); }}
+                  className="px-6 py-2.5 bg-neutral-800 text-white font-bold uppercase text-sm rounded-lg hover:bg-neutral-700 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map(product => (
-              <ProductCard
-                key={`${product.sportId}-${product.cutSlug}-${product.garmentType}`}
-                product={product}
-                onSelect={() => onSelectProduct(
-                  product.sportId,
-                  product.sportLabel,
-                  product.cutSlug,
-                  product.cutLabel,
-                  product.garmentType,
-                  product.cut
-                )}
-              />
-            ))}
-          </div>
-        )}
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProducts.map(product => (
+                <ProductCard
+                  key={`${product.sportId}-${product.cutSlug}-${product.garmentType}`}
+                  product={product}
+                  onSelect={() => onSelectProduct(
+                    product.sportId,
+                    product.sportLabel,
+                    product.cutSlug,
+                    product.cutLabel,
+                    product.garmentType,
+                    product.cut
+                  )}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1287,6 +1359,7 @@ const ProductCard: React.FC<{
   };
   onSelect: () => void;
 }> = ({ product, onSelect }) => {
+  const [isHovered, setIsHovered] = useState(false);
   const isJersey = product.garmentType === 'jersey';
   const shape = isJersey ? product.cut.jersey.shape : product.cut.shorts.shape;
   const trim = isJersey ? product.cut.jersey.trim : product.cut.shorts.trim;
@@ -1294,63 +1367,92 @@ const ProductCard: React.FC<{
   return (
     <button
       onClick={onSelect}
-      className="group bg-black border border-neutral-800 rounded-xl overflow-hidden hover:border-brand-accent transition-all hover:shadow-lg hover:shadow-brand-accent/20 text-left w-full"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="group bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden hover:border-brand-accent/50 transition-all duration-300 hover:shadow-2xl hover:shadow-brand-accent/10 text-left w-full hover:-translate-y-1"
     >
-      {/* Preview */}
-      <div className="aspect-[4/5] bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 p-8 flex items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-        <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-xl relative z-10">
+      <div className="aspect-square bg-gradient-to-br from-neutral-100 via-neutral-50 to-neutral-200 p-6 flex items-center justify-center relative overflow-hidden">
+        <div className="absolute top-3 left-3 flex items-center gap-2">
+          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+            isJersey
+              ? 'bg-brand-accent/90 text-black'
+              : 'bg-emerald-500/90 text-white'
+          }`}>
+            {isJersey ? 'Jersey' : 'Shorts'}
+          </span>
+        </div>
+
+        <div className="absolute top-3 right-3">
+          <span className="px-2.5 py-1 bg-black/80 backdrop-blur-sm rounded-full text-[10px] font-bold uppercase text-white">
+            {product.sportLabel}
+          </span>
+        </div>
+
+        <div className={`absolute inset-0 bg-gradient-to-t from-black/20 to-transparent transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`} />
+
+        <svg
+          viewBox="0 0 400 500"
+          className={`w-full h-full drop-shadow-2xl relative z-10 transition-transform duration-500 ${isHovered ? 'scale-110' : 'scale-100'}`}
+        >
+          <defs>
+            <linearGradient id={`gradient-${product.sportId}-${product.cutSlug}-${product.garmentType}`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#1a1a1a" />
+              <stop offset="100%" stopColor="#2d2d2d" />
+            </linearGradient>
+          </defs>
           <path
             d={shape.front}
-            fill="#2a2a2a"
-            stroke="#1a1a1a"
-            strokeWidth="2"
+            fill={`url(#gradient-${product.sportId}-${product.cutSlug}-${product.garmentType})`}
+            stroke="#0a0a0a"
+            strokeWidth="1"
           />
           {trim.front && (
             <path
               d={trim.front}
               fill="none"
-              stroke={isJersey ? "#D2F802" : "#22c55e"}
+              stroke={isJersey ? "#D2F802" : "#10b981"}
               strokeWidth="3"
+              className={`transition-all duration-300 ${isHovered ? 'opacity-100' : 'opacity-70'}`}
             />
           )}
         </svg>
-      </div>
 
-      {/* Info */}
-      <div className="p-4 border-t border-neutral-800">
-        <div className="flex items-center gap-2 mb-2">
-          {isJersey ? (
-            <Shirt size={16} className="text-brand-accent" />
-          ) : (
-            <Scissors size={16} className="text-green-500" />
-          )}
-          <span className="text-xs font-bold text-neutral-500 uppercase">
-            {product.sportLabel}
+        <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 transition-all duration-300 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <span className="px-4 py-2 bg-brand-accent text-black font-bold uppercase text-xs rounded-full flex items-center gap-2 shadow-lg">
+            Customize
+            <ChevronLeft size={14} className="rotate-180" />
           </span>
         </div>
+      </div>
 
-        <h3 className="font-bold text-white text-xl mb-2 uppercase leading-tight">
-          {product.cutLabel} {isJersey ? 'Jersey' : 'Shorts'}
-        </h3>
-
-        <p className="text-sm text-neutral-400 mb-3 line-clamp-2">
-          {product.description}
-        </p>
-
-        <div className="flex items-center justify-between pt-3 border-t border-neutral-800">
-          <div className="text-2xl font-bold text-brand-accent">
-            ${product.price.toFixed(2)}
+      <div className="p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h3 className="font-bold text-white text-lg uppercase leading-tight group-hover:text-brand-accent transition-colors">
+              {product.cutLabel}
+            </h3>
+            <p className="text-xs text-neutral-500 uppercase tracking-wider mt-0.5">
+              {isJersey ? 'Custom Jersey' : 'Custom Shorts'}
+            </p>
           </div>
-          <div className="text-xs text-neutral-500">
-            {product.templateCount} design{product.templateCount !== 1 ? 's' : ''}
+          <div className="text-right">
+            <div className="text-xl font-black text-white">
+              ${product.price.toFixed(0)}
+            </div>
+            <div className="text-[10px] text-neutral-600 uppercase">per unit</div>
           </div>
         </div>
 
-        <div className="mt-3">
-          <div className="flex items-center justify-center gap-2 text-brand-accent font-bold uppercase text-sm group-hover:gap-3 transition-all">
-            <span>Choose Design</span>
-            <ChevronLeft size={16} className="rotate-180" />
+        <div className="flex items-center justify-between pt-3 border-t border-neutral-800">
+          <div className="flex items-center gap-1.5">
+            <Layers size={12} className="text-neutral-600" />
+            <span className="text-xs text-neutral-500">
+              {product.templateCount} design{product.templateCount !== 1 ? 's' : ''} available
+            </span>
+          </div>
+          <div className={`flex items-center gap-1 text-xs font-bold uppercase transition-all ${isHovered ? 'text-brand-accent' : 'text-neutral-600'}`}>
+            <span>View</span>
+            <ChevronLeft size={12} className="rotate-180" />
           </div>
         </div>
       </div>
