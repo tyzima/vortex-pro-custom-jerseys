@@ -484,6 +484,11 @@ const TemplateEditor: React.FC<{
   onClose: () => void;
 }> = ({ template, mode, viewSide, setViewSide, selectedCut, setSelectedCut, onClose }) => {
   const [uploading, setUploading] = useState(false);
+  const [previewColors, setPreviewColors] = useState({
+    primary: '#D2F802',
+    secondary: '#000000',
+    accent: '#FFFFFF'
+  });
   const { refresh } = useTemplateLibrary();
   const cut = template.sport.cuts[selectedCut];
 
@@ -535,11 +540,22 @@ const TemplateEditor: React.FC<{
               <h2 className="text-2xl font-bold uppercase text-white">{template.label}</h2>
               <p className="text-sm text-neutral-400">{template.sport.label}</p>
             </div>
-            {mode === 'view' && (
-              <span className="px-3 py-1 bg-neutral-800 text-neutral-400 text-xs font-bold uppercase rounded-full">
-                View Only
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {mode === 'view' && (
+                <span className="px-3 py-1 bg-neutral-800 text-neutral-400 text-xs font-bold uppercase rounded-full">
+                  View Only
+                </span>
+              )}
+              {mode === 'edit' && (
+                <span className={`px-3 py-1 text-xs font-bold uppercase rounded-full ${
+                  template.isPublished
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {template.isPublished ? 'Published' : 'Draft'}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -579,72 +595,229 @@ const TemplateEditor: React.FC<{
 
       {/* Editor Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Canvas */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-br from-neutral-950 to-black">
-          <div className="w-full max-w-2xl">
-            <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-2xl">
-              {/* Base Shape */}
-              {cut?.jersey.shape[viewSide] && (
-                <path
-                  d={cut.jersey.shape[viewSide]}
-                  fill="#0a0a0a"
-                  stroke="#222"
-                  strokeWidth="1"
-                  opacity="0.3"
-                />
-              )}
-
-              {/* Template Layers */}
-              {template.layers.map((layer, i) => {
-                const colors = ['#D2F802', '#60a5fa', '#f97316', '#22c55e', '#db2777', '#a78bfa'];
-                return layer.paths.jersey[viewSide].map((path, j) => (
-                  <path
-                    key={`${layer.id}-${j}`}
-                    d={path}
-                    fill={colors[i % colors.length]}
-                    stroke="#fff"
-                    strokeWidth="1"
-                    opacity="0.85"
-                  />
-                ));
-              })}
-            </svg>
+        {/* Left Sidebar - Cut Selector */}
+        <div className="w-64 bg-black border-r border-neutral-800 flex flex-col">
+          <div className="p-4 border-b border-neutral-800">
+            <h3 className="font-bold uppercase text-sm text-neutral-400">Step 1: Select Cut</h3>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {Object.entries(template.sport.cuts).map(([cutSlug, cutData]) => (
+              <button
+                key={cutSlug}
+                onClick={() => setSelectedCut(cutSlug)}
+                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                  selectedCut === cutSlug
+                    ? 'border-brand-accent bg-brand-accent/10'
+                    : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700'
+                }`}
+              >
+                <div className="font-bold text-white text-sm mb-2">{cutData.label}</div>
+                <div className="aspect-square bg-black rounded overflow-hidden p-2">
+                  <svg viewBox="0 0 400 500" className="w-full h-full">
+                    <path
+                      d={cutData.jersey.shape.front}
+                      fill="#1a1a1a"
+                      stroke="#333"
+                      strokeWidth="1"
+                    />
+                  </svg>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Right Sidebar - Tools */}
+        {/* Center - Canvas Preview */}
+        <div className="flex-1 flex flex-col bg-gradient-to-br from-neutral-950 to-black">
+          <div className="p-4 border-b border-neutral-800/50">
+            <h3 className="font-bold uppercase text-sm text-neutral-400 text-center">
+              Customer Preview - Step 2: Template Design
+            </h3>
+          </div>
+
+          <div className="flex-1 p-8 flex items-center justify-center">
+            <div className="relative" style={{ width: '600px', maxWidth: '100%' }}>
+              {/* Jersey and Shorts Side by Side */}
+              <div className="grid grid-cols-2 gap-8">
+                {/* JERSEY */}
+                <div>
+                  <div className="text-center text-xs font-bold text-neutral-500 uppercase mb-2">Jersey</div>
+                  <svg viewBox="0 0 400 500" className="w-full drop-shadow-2xl">
+                    {/* Jersey Base Shape */}
+                    {cut?.jersey.shape[viewSide] && (
+                      <path
+                        d={cut.jersey.shape[viewSide]}
+                        fill={previewColors.secondary}
+                        stroke="#000"
+                        strokeWidth="2"
+                      />
+                    )}
+
+                    {/* Jersey Template Layers */}
+                    {template.layers.map((layer, i) => {
+                      return layer.paths.jersey[viewSide].map((path, j) => (
+                        <path
+                          key={`jersey-${layer.id}-${j}`}
+                          d={path}
+                          fill={i === 0 ? previewColors.primary : i === 1 ? previewColors.accent : previewColors.primary}
+                          stroke="none"
+                        />
+                      ));
+                    })}
+
+                    {/* Jersey Trim */}
+                    {cut?.jersey.trim[viewSide] && (
+                      <path
+                        d={cut.jersey.trim[viewSide]}
+                        fill="none"
+                        stroke={previewColors.accent}
+                        strokeWidth="3"
+                      />
+                    )}
+                  </svg>
+                </div>
+
+                {/* SHORTS */}
+                <div>
+                  <div className="text-center text-xs font-bold text-neutral-500 uppercase mb-2">Shorts</div>
+                  <svg viewBox="0 0 400 500" className="w-full drop-shadow-2xl">
+                    {/* Shorts Base Shape */}
+                    {cut?.shorts.shape[viewSide] && (
+                      <path
+                        d={cut.shorts.shape[viewSide]}
+                        fill={previewColors.secondary}
+                        stroke="#000"
+                        strokeWidth="2"
+                      />
+                    )}
+
+                    {/* Shorts Template Layers */}
+                    {template.layers.map((layer, i) => {
+                      return layer.paths.shorts[viewSide].map((path, j) => (
+                        <path
+                          key={`shorts-${layer.id}-${j}`}
+                          d={path}
+                          fill={i === 0 ? previewColors.primary : i === 1 ? previewColors.accent : previewColors.primary}
+                          stroke="none"
+                        />
+                      ));
+                    })}
+
+                    {/* Shorts Trim */}
+                    {cut?.shorts.trim[viewSide] && (
+                      <path
+                        d={cut.shorts.trim[viewSide]}
+                        fill="none"
+                        stroke={previewColors.accent}
+                        strokeWidth="3"
+                      />
+                    )}
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Sidebar - Layer Management */}
         {mode === 'edit' && (
           <div className="w-80 bg-black border-l border-neutral-800 flex flex-col">
             <div className="p-4 border-b border-neutral-800">
-              <h3 className="font-bold uppercase text-lg">Edit Tools</h3>
+              <h3 className="font-bold uppercase text-sm text-neutral-400">Template Builder</h3>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Cut Selector */}
+              {/* Publish Status */}
               <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
-                <label className="block text-sm font-bold text-neutral-400 uppercase mb-2">
-                  Preview Cut
-                </label>
-                <select
-                  value={selectedCut}
-                  onChange={(e) => setSelectedCut(e.target.value)}
-                  className="w-full px-3 py-2 bg-black border border-neutral-700 rounded text-white text-sm focus:border-brand-accent outline-none"
-                >
-                  {Object.keys(template.sport.cuts).map(cutSlug => (
-                    <option key={cutSlug} value={cutSlug}>{cutSlug}</option>
-                  ))}
-                </select>
+                <h4 className="text-sm font-bold uppercase mb-3">Status</h4>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-white font-medium mb-1">
+                      {template.isPublished ? 'Published' : 'Draft'}
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      {template.isPublished ? 'Visible to customers' : 'Hidden from customers'}
+                    </div>
+                  </div>
+                  <button
+                    className={`px-4 py-2 rounded-lg font-bold text-xs uppercase transition-colors ${
+                      template.isPublished
+                        ? 'bg-yellow-500 text-black hover:bg-yellow-600'
+                        : 'bg-green-500 text-black hover:bg-green-600'
+                    }`}
+                  >
+                    {template.isPublished ? 'Unpublish' : 'Publish'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Color Preview Controls */}
+              <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+                <h4 className="text-sm font-bold uppercase mb-3">Preview Colors</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-neutral-400 block mb-1">Primary</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={previewColors.primary}
+                        onChange={(e) => setPreviewColors(prev => ({ ...prev, primary: e.target.value }))}
+                        className="w-12 h-10 rounded border border-neutral-700 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={previewColors.primary}
+                        onChange={(e) => setPreviewColors(prev => ({ ...prev, primary: e.target.value }))}
+                        className="flex-1 px-3 py-2 bg-black border border-neutral-700 rounded text-white text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 block mb-1">Secondary</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={previewColors.secondary}
+                        onChange={(e) => setPreviewColors(prev => ({ ...prev, secondary: e.target.value }))}
+                        className="w-12 h-10 rounded border border-neutral-700 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={previewColors.secondary}
+                        onChange={(e) => setPreviewColors(prev => ({ ...prev, secondary: e.target.value }))}
+                        className="flex-1 px-3 py-2 bg-black border border-neutral-700 rounded text-white text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400 block mb-1">Accent</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={previewColors.accent}
+                        onChange={(e) => setPreviewColors(prev => ({ ...prev, accent: e.target.value }))}
+                        className="w-12 h-10 rounded border border-neutral-700 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={previewColors.accent}
+                        onChange={(e) => setPreviewColors(prev => ({ ...prev, accent: e.target.value }))}
+                        className="flex-1 px-3 py-2 bg-black border border-neutral-700 rounded text-white text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Upload Layer */}
               <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
                 <h4 className="text-sm font-bold text-brand-accent uppercase mb-3 flex items-center gap-2">
                   <Upload size={14} />
-                  Upload Layer ({viewSide})
+                  Add Layer ({viewSide})
                 </h4>
                 <div className="space-y-2">
                   <div>
-                    <label className="text-xs text-neutral-500 block mb-1">Jersey</label>
+                    <label className="text-xs text-neutral-500 block mb-1">Jersey SVG</label>
                     <input
                       type="file"
                       accept=".svg"
@@ -657,7 +830,7 @@ const TemplateEditor: React.FC<{
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-neutral-500 block mb-1">Shorts</label>
+                    <label className="text-xs text-neutral-500 block mb-1">Shorts SVG</label>
                     <input
                       type="file"
                       accept=".svg"
@@ -681,22 +854,32 @@ const TemplateEditor: React.FC<{
               <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
                 <h4 className="text-sm font-bold uppercase mb-3 flex items-center gap-2">
                   <Layers size={14} />
-                  Layers ({template.layers.length})
+                  Design Layers ({template.layers.length})
                 </h4>
                 {template.layers.length === 0 ? (
-                  <p className="text-xs text-neutral-600 text-center py-4">
-                    No layers yet
-                  </p>
+                  <div className="text-center py-6">
+                    <p className="text-xs text-neutral-600 mb-2">No design layers yet</p>
+                    <p className="text-xs text-neutral-700">Upload SVG files to add layers</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {template.layers.map((layer, i) => (
                       <div
                         key={layer.id}
-                        className="bg-black rounded p-3 border border-neutral-800"
+                        className="bg-black rounded p-3 border border-neutral-800 hover:border-brand-accent transition-colors cursor-move"
                       >
-                        <div className="font-bold text-white text-sm mb-1">{layer.label}</div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-bold text-white text-sm">{layer.label}</div>
+                          <button
+                            className="p-1 hover:bg-neutral-700 rounded transition-colors"
+                            title="Delete layer"
+                          >
+                            <Trash2 size={14} className="text-red-500" />
+                          </button>
+                        </div>
                         <div className="text-xs text-neutral-500">
-                          {layer.paths.jersey.front.length + layer.paths.jersey.back.length} paths
+                          Jersey: {layer.paths.jersey.front.length + layer.paths.jersey.back.length} paths •
+                          Shorts: {layer.paths.shorts.front.length + layer.paths.shorts.back.length} paths
                         </div>
                       </div>
                     ))}
