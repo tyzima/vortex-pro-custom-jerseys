@@ -543,6 +543,7 @@ const TemplateEditor: React.FC<{
   onClose: () => void;
 }> = ({ template, mode, viewSide, setViewSide, selectedCut, setSelectedCut, onClose }) => {
   const [uploading, setUploading] = useState(false);
+  const [selectedGarment, setSelectedGarment] = useState<'jersey' | 'shorts'>('jersey');
   const [previewColors, setPreviewColors] = useState({
     primary: '#D2F802',
     secondary: '#000000',
@@ -618,7 +619,7 @@ const TemplateEditor: React.FC<{
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Garment Type Switcher */}
+            {/* Cut Type Switcher */}
             <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1">
               {Object.entries(template.sport.cuts).map(([cutSlug, cutData]) => (
                 <button
@@ -633,6 +634,30 @@ const TemplateEditor: React.FC<{
                   {cutData.label}
                 </button>
               ))}
+            </div>
+
+            {/* Garment Selector */}
+            <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1">
+              <button
+                onClick={() => setSelectedGarment('jersey')}
+                className={`px-4 py-2 rounded text-sm font-bold uppercase transition-colors ${
+                  selectedGarment === 'jersey'
+                    ? 'bg-brand-accent text-black'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Jersey
+              </button>
+              <button
+                onClick={() => setSelectedGarment('shorts')}
+                className={`px-4 py-2 rounded text-sm font-bold uppercase transition-colors ${
+                  selectedGarment === 'shorts'
+                    ? 'bg-brand-accent text-black'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Shorts
+              </button>
             </div>
 
             {/* View Toggle */}
@@ -674,15 +699,15 @@ const TemplateEditor: React.FC<{
         {/* Left Sidebar - Current Cut Info */}
         <div className="w-64 bg-black border-r border-neutral-800 flex flex-col">
           <div className="p-4 border-b border-neutral-800">
-            <h3 className="font-bold uppercase text-sm text-neutral-400 mb-1">Current Garment</h3>
-            <div className="text-white text-lg font-bold">{cut?.label}</div>
+            <h3 className="font-bold uppercase text-sm text-neutral-400 mb-1">Editing</h3>
+            <div className="text-white text-lg font-bold">{cut?.label} {selectedGarment === 'jersey' ? 'Jersey' : 'Shorts'}</div>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             <div className="bg-neutral-900 rounded-lg p-3 border border-neutral-800">
               <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded overflow-hidden p-4 mb-2">
                 <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-md">
                   <path
-                    d={cut?.jersey.shape.front}
+                    d={selectedGarment === 'jersey' ? cut?.jersey.shape.front : cut?.shorts.shape.front}
                     fill="#2a2a2a"
                     stroke="#1a1a1a"
                     strokeWidth="2"
@@ -690,7 +715,7 @@ const TemplateEditor: React.FC<{
                 </svg>
               </div>
               <div className="text-xs text-neutral-400 text-center">
-                Use the switcher above to change garment type
+                Use the switcher above to change cut or garment
               </div>
             </div>
           </div>
@@ -705,85 +730,69 @@ const TemplateEditor: React.FC<{
           </div>
 
           <div className="flex-1 p-8 flex items-center justify-center">
-            <div className="relative bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded-2xl p-8 shadow-2xl" style={{ width: '700px', maxWidth: '100%' }}>
-              {/* Jersey and Shorts Side by Side */}
-              <div className="grid grid-cols-2 gap-8">
-                {/* JERSEY */}
-                <div>
-                  <div className="text-center text-xs font-bold text-neutral-600 uppercase mb-3">Jersey</div>
-                  <svg viewBox="0 0 400 500" className="w-full drop-shadow-xl">
-                    {/* Jersey Base Shape */}
-                    {cut?.jersey.shape[viewSide] && (
-                      <path
-                        d={cut.jersey.shape[viewSide]}
-                        fill={previewColors.secondary}
-                        stroke="#1a1a1a"
-                        strokeWidth="2"
-                      />
-                    )}
-
-                    {/* Jersey Template Layers */}
-                    {template.layers.map((layer, i) => {
-                      return layer.paths.jersey[viewSide].map((path, j) => (
-                        <path
-                          key={`jersey-${layer.id}-${j}`}
-                          d={path}
-                          fill={i === 0 ? previewColors.primary : i === 1 ? previewColors.accent : previewColors.primary}
-                          stroke="none"
-                        />
-                      ));
-                    })}
-
-                    {/* Jersey Trim */}
-                    {cut?.jersey.trim[viewSide] && (
-                      <path
-                        d={cut.jersey.trim[viewSide]}
-                        fill="none"
-                        stroke={previewColors.accent}
-                        strokeWidth="3"
-                      />
-                    )}
-                  </svg>
-                </div>
-
-                {/* SHORTS */}
-                <div>
-                  <div className="text-center text-xs font-bold text-neutral-600 uppercase mb-3">Shorts</div>
-                  <svg viewBox="0 0 400 500" className="w-full drop-shadow-xl">
-                    {/* Shorts Base Shape */}
-                    {cut?.shorts.shape[viewSide] && (
-                      <path
-                        d={cut.shorts.shape[viewSide]}
-                        fill={previewColors.secondary}
-                        stroke="#1a1a1a"
-                        strokeWidth="2"
-                      />
-                    )}
-
-                    {/* Shorts Template Layers */}
-                    {template.layers.map((layer, i) => {
-                      return layer.paths.shorts[viewSide].map((path, j) => (
-                        <path
-                          key={`shorts-${layer.id}-${j}`}
-                          d={path}
-                          fill={i === 0 ? previewColors.primary : i === 1 ? previewColors.accent : previewColors.primary}
-                          stroke="none"
-                        />
-                      ));
-                    })}
-
-                    {/* Shorts Trim */}
-                    {cut?.shorts.trim[viewSide] && (
-                      <path
-                        d={cut.shorts.trim[viewSide]}
-                        fill="none"
-                        stroke={previewColors.accent}
-                        strokeWidth="3"
-                      />
-                    )}
-                  </svg>
-                </div>
+            <div className="relative bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded-2xl p-8 shadow-2xl" style={{ width: '500px', maxWidth: '100%' }}>
+              <div className="text-center text-xs font-bold text-neutral-600 uppercase mb-3">
+                {selectedGarment === 'jersey' ? 'Jersey' : 'Shorts'}
               </div>
+              <svg viewBox="0 0 400 500" className="w-full drop-shadow-xl">
+                {/* Base Shape */}
+                {selectedGarment === 'jersey' ? (
+                  cut?.jersey.shape[viewSide] && (
+                    <path
+                      d={cut.jersey.shape[viewSide]}
+                      fill={previewColors.secondary}
+                      stroke="#1a1a1a"
+                      strokeWidth="2"
+                    />
+                  )
+                ) : (
+                  cut?.shorts.shape[viewSide] && (
+                    <path
+                      d={cut.shorts.shape[viewSide]}
+                      fill={previewColors.secondary}
+                      stroke="#1a1a1a"
+                      strokeWidth="2"
+                    />
+                  )
+                )}
+
+                {/* Template Layers */}
+                {template.layers.map((layer, i) => {
+                  const paths = selectedGarment === 'jersey'
+                    ? layer.paths.jersey[viewSide]
+                    : layer.paths.shorts[viewSide];
+
+                  return paths.map((path, j) => (
+                    <path
+                      key={`${selectedGarment}-${layer.id}-${j}`}
+                      d={path}
+                      fill={i === 0 ? previewColors.primary : i === 1 ? previewColors.accent : previewColors.primary}
+                      stroke="none"
+                    />
+                  ));
+                })}
+
+                {/* Trim */}
+                {selectedGarment === 'jersey' ? (
+                  cut?.jersey.trim[viewSide] && (
+                    <path
+                      d={cut.jersey.trim[viewSide]}
+                      fill="none"
+                      stroke={previewColors.accent}
+                      strokeWidth="3"
+                    />
+                  )
+                ) : (
+                  cut?.shorts.trim[viewSide] && (
+                    <path
+                      d={cut.shorts.trim[viewSide]}
+                      fill="none"
+                      stroke={previewColors.accent}
+                      strokeWidth="3"
+                    />
+                  )
+                )}
+              </svg>
             </div>
           </div>
         </div>
@@ -882,33 +891,20 @@ const TemplateEditor: React.FC<{
               <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
                 <h4 className="text-sm font-bold text-brand-accent uppercase mb-3 flex items-center gap-2">
                   <Upload size={14} />
-                  Add Layer ({viewSide})
+                  Add Layer to {selectedGarment === 'jersey' ? 'Jersey' : 'Shorts'}
                 </h4>
                 <div className="space-y-2">
                   <div>
-                    <label className="text-xs text-neutral-500 block mb-1">Jersey SVG</label>
+                    <label className="text-xs text-neutral-500 block mb-1">Upload SVG ({viewSide} side)</label>
                     <input
                       type="file"
                       accept=".svg"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) handleUploadLayer(file, 'jersey');
+                        if (file) handleUploadLayer(file, selectedGarment);
                       }}
                       disabled={uploading}
                       className="w-full text-xs text-neutral-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-brand-accent file:text-black hover:file:bg-brand-accent/90 cursor-pointer disabled:opacity-50"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-neutral-500 block mb-1">Shorts SVG</label>
-                    <input
-                      type="file"
-                      accept=".svg"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleUploadLayer(file, 'shorts');
-                      }}
-                      disabled={uploading}
-                      className="w-full text-xs text-neutral-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-green-500 file:text-black hover:file:bg-green-600 cursor-pointer disabled:opacity-50"
                     />
                   </div>
                   {uploading && (
@@ -916,6 +912,9 @@ const TemplateEditor: React.FC<{
                       Uploading...
                     </div>
                   )}
+                  <p className="text-xs text-neutral-600">
+                    Upload an SVG file with design paths for the {viewSide} side of the {selectedGarment}.
+                  </p>
                 </div>
               </div>
 
@@ -947,8 +946,11 @@ const TemplateEditor: React.FC<{
                           </button>
                         </div>
                         <div className="text-xs text-neutral-500">
-                          Jersey: {layer.paths.jersey.front.length + layer.paths.jersey.back.length} paths •
-                          Shorts: {layer.paths.shorts.front.length + layer.paths.shorts.back.length} paths
+                          {selectedGarment === 'jersey' ? (
+                            <>Front: {layer.paths.jersey.front.length} paths • Back: {layer.paths.jersey.back.length} paths</>
+                          ) : (
+                            <>Front: {layer.paths.shorts.front.length} paths • Back: {layer.paths.shorts.back.length} paths</>
+                          )}
                         </div>
                       </div>
                     ))}
