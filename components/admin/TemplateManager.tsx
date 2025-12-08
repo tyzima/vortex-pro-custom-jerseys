@@ -18,13 +18,16 @@ import {
   MoreVertical,
   Shirt,
   Scissors,
-  Package
+  Package,
+  Maximize2
 } from 'lucide-react';
 import { useTemplateLibrary } from '../../contexts/TemplateLibraryContext';
 import { Template, Sport, ProductCut } from '../../types';
 import { createTemplate } from '../../lib/templateService';
+import { CanvasViewer } from './CanvasViewer';
 
 type ViewMode = 'gallery' | 'list';
+type TemplateViewMode = 'grid' | 'canvas';
 type EditorMode = 'view' | 'edit' | null;
 type ViewSide = 'front' | 'back';
 type PageView = 'products' | 'templates';
@@ -48,6 +51,7 @@ export const TemplateManager: React.FC = () => {
   const [pageView, setPageView] = useState<PageView>('products');
   const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('gallery');
+  const [templateViewMode, setTemplateViewMode] = useState<TemplateViewMode>('canvas');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSport, setSelectedSport] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'sport' | 'recent'>('recent');
@@ -202,151 +206,183 @@ export const TemplateManager: React.FC = () => {
 
   return (
     <div className="h-full bg-neutral-950 flex flex-col">
-      {/* HEADER */}
-      <div className="border-b border-neutral-800 bg-black">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
+      {templateViewMode === 'canvas' && selectedProduct && SPORTS_LIBRARY ? (
+        <div className="flex flex-col h-full">
+          {/* Minimal Header for Canvas Mode */}
+          <div className="border-b border-neutral-800 bg-black px-6 py-3 flex items-center justify-between">
+            <button
+              onClick={handleBackToProducts}
+              className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+              title="Back to Products"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <div className="flex items-center gap-3">
               <button
-                onClick={handleBackToProducts}
-                className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
-                title="Back to Products"
+                onClick={() => setTemplateViewMode('grid')}
+                className="flex items-center gap-2 px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-neutral-400 hover:text-white hover:border-neutral-600 transition-all"
+                title="Switch to Grid View"
               >
-                <ChevronLeft size={24} />
+                <Grid3x3 size={16} />
+                <span className="text-sm font-bold uppercase">Grid View</span>
               </button>
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-3xl font-bold uppercase text-white">Design Templates</h1>
-                  {selectedProduct && (
-                    <span className="px-3 py-1 bg-brand-accent/20 text-brand-accent text-sm font-bold uppercase rounded-full border border-brand-accent/30">
-                      {selectedProduct.cutLabel} {selectedProduct.garmentType === 'jersey' ? 'Jersey' : 'Shorts'} • {selectedProduct.sportLabel}
-                    </span>
-                  )}
+              <button
+                onClick={() => setShowNewTemplateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-brand-accent text-black font-bold uppercase text-sm rounded-lg hover:bg-brand-accent/90 transition-all"
+              >
+                <Plus size={16} />
+                New Template
+              </button>
+            </div>
+          </div>
+          <CanvasViewer
+            sportId={selectedProduct.sportId}
+            sportLabel={selectedProduct.sportLabel}
+            garmentType={selectedProduct.garmentType}
+            templates={filteredTemplates}
+            cuts={SPORTS_LIBRARY[selectedProduct.sportId].cuts}
+            onEditTemplate={(template) => openEditor(template, 'edit')}
+          />
+        </div>
+      ) : (
+        <>
+          {/* HEADER */}
+          <div className="border-b border-neutral-800 bg-black">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleBackToProducts}
+                    className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+                    title="Back to Products"
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h1 className="text-3xl font-bold uppercase text-white">Design Templates</h1>
+                      {selectedProduct && (
+                        <span className="px-3 py-1 bg-brand-accent/20 text-brand-accent text-sm font-bold uppercase rounded-full border border-brand-accent/30">
+                          {selectedProduct.cutLabel} {selectedProduct.garmentType === 'jersey' ? 'Jersey' : 'Shorts'} • {selectedProduct.sportLabel}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-neutral-400">Browse design templates for this product</p>
+                  </div>
                 </div>
-                <p className="text-neutral-400">Browse design templates for this product</p>
+                <button
+                  onClick={() => setShowNewTemplateModal(true)}
+                  className="flex items-center gap-2 px-6 py-3 bg-brand-accent text-black font-bold uppercase text-sm rounded-lg hover:bg-brand-accent/90 transition-all hover:scale-105"
+                >
+                  <Plus size={18} />
+                  New Template
+                </button>
+              </div>
+
+              {/* TOOLBAR */}
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* Search */}
+                <div className="flex-1 min-w-[300px] relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search templates..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:border-brand-accent outline-none transition-colors"
+                  />
+                </div>
+
+                {/* Sport Filter */}
+                <select
+                  value={selectedSport}
+                  onChange={(e) => setSelectedSport(e.target.value)}
+                  className="px-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:border-brand-accent outline-none cursor-pointer"
+                >
+                  <option value="all">All Sports</option>
+                  {SPORTS_LIBRARY && Object.entries(SPORTS_LIBRARY).map(([id, sport]) => (
+                    <option key={id} value={id}>{sport.label}</option>
+                  ))}
+                </select>
+
+                {/* Sort */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:border-brand-accent outline-none cursor-pointer"
+                >
+                  <option value="recent">Most Recent</option>
+                  <option value="name">Name A-Z</option>
+                  <option value="sport">Sport</option>
+                </select>
+
+                {/* View Mode */}
+                <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1">
+                  <button
+                    onClick={() => setTemplateViewMode('canvas')}
+                    className={`p-2 rounded transition-colors ${
+                      templateViewMode === 'canvas'
+                        ? 'bg-brand-accent text-black'
+                        : 'text-neutral-400 hover:text-white'
+                    }`}
+                    title="Canvas View"
+                  >
+                    <Maximize2 size={18} />
+                  </button>
+                  <button
+                    onClick={() => setTemplateViewMode('grid')}
+                    className={`p-2 rounded transition-colors ${
+                      templateViewMode === 'grid'
+                        ? 'bg-brand-accent text-black'
+                        : 'text-neutral-400 hover:text-white'
+                    }`}
+                    title="Grid View"
+                  >
+                    <Grid3x3 size={18} />
+                  </button>
+                </div>
               </div>
             </div>
-            <button
-              onClick={() => setShowNewTemplateModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-brand-accent text-black font-bold uppercase text-sm rounded-lg hover:bg-brand-accent/90 transition-all hover:scale-105"
-            >
-              <Plus size={18} />
-              New Template
-            </button>
-          </div>
 
-          {/* TOOLBAR */}
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Search */}
-            <div className="flex-1 min-w-[300px] relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
-              <input
-                type="text"
-                placeholder="Search templates..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:border-brand-accent outline-none transition-colors"
-              />
-            </div>
-
-            {/* Sport Filter */}
-            <select
-              value={selectedSport}
-              onChange={(e) => setSelectedSport(e.target.value)}
-              className="px-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:border-brand-accent outline-none cursor-pointer"
-            >
-              <option value="all">All Sports</option>
-              {SPORTS_LIBRARY && Object.entries(SPORTS_LIBRARY).map(([id, sport]) => (
-                <option key={id} value={id}>{sport.label}</option>
-              ))}
-            </select>
-
-            {/* Sort */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:border-brand-accent outline-none cursor-pointer"
-            >
-              <option value="recent">Most Recent</option>
-              <option value="name">Name A-Z</option>
-              <option value="sport">Sport</option>
-            </select>
-
-            {/* View Mode */}
-            <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('gallery')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'gallery'
-                    ? 'bg-brand-accent text-black'
-                    : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                <Grid3x3 size={18} />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-brand-accent text-black'
-                    : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                <List size={18} />
-              </button>
+            {/* Stats Bar */}
+            <div className="px-6 py-3 bg-neutral-900/50 border-t border-neutral-800 flex items-center gap-6 text-sm">
+              <span className="text-neutral-400">
+                <span className="text-white font-bold">{filteredTemplates.length}</span> templates
+              </span>
+              {selectedSport !== 'all' && SPORTS_LIBRARY && (
+                <span className="text-neutral-400">
+                  in <span className="text-brand-accent font-bold">{SPORTS_LIBRARY[selectedSport]?.label}</span>
+                </span>
+              )}
             </div>
           </div>
-        </div>
 
-        {/* Stats Bar */}
-        <div className="px-6 py-3 bg-neutral-900/50 border-t border-neutral-800 flex items-center gap-6 text-sm">
-          <span className="text-neutral-400">
-            <span className="text-white font-bold">{filteredTemplates.length}</span> templates
-          </span>
-          {selectedSport !== 'all' && SPORTS_LIBRARY && (
-            <span className="text-neutral-400">
-              in <span className="text-brand-accent font-bold">{SPORTS_LIBRARY[selectedSport]?.label}</span>
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* CONTENT */}
-      <div className="flex-1 overflow-auto p-6">
-        {filteredTemplates.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-6xl mb-4 opacity-20">🎨</div>
-              <h3 className="text-xl font-bold text-neutral-600 mb-2">No templates found</h3>
-              <p className="text-neutral-500">Try adjusting your search or filters</p>
-            </div>
+          {/* CONTENT */}
+          <div className="flex-1 overflow-auto p-6">
+            {filteredTemplates.length === 0 ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-6xl mb-4 opacity-20">🎨</div>
+                  <h3 className="text-xl font-bold text-neutral-600 mb-2">No templates found</h3>
+                  <p className="text-neutral-500">Try adjusting your search or filters</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredTemplates.map(template => (
+                  <TemplateCard
+                    key={`${template.sportId}-${template.id}`}
+                    template={template}
+                    selectedCutSlug={selectedProduct?.cutSlug}
+                    onView={() => openEditor(template, 'view')}
+                    onEdit={() => openEditor(template, 'edit')}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        ) : viewMode === 'gallery' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredTemplates.map(template => (
-              <TemplateCard
-                key={`${template.sportId}-${template.id}`}
-                template={template}
-                selectedCutSlug={selectedProduct?.cutSlug}
-                onView={() => openEditor(template, 'view')}
-                onEdit={() => openEditor(template, 'edit')}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredTemplates.map(template => (
-              <TemplateListItem
-                key={`${template.sportId}-${template.id}`}
-                template={template}
-                selectedCutSlug={selectedProduct?.cutSlug}
-                onView={() => openEditor(template, 'view')}
-                onEdit={() => openEditor(template, 'edit')}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* NEW TEMPLATE MODAL */}
       {showNewTemplateModal && (
