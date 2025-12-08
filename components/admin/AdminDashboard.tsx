@@ -15,9 +15,9 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-[200] flex flex-col text-white overflow-hidden animate-fade-in">
+    <div className="fixed inset-0 z-[200] flex flex-col text-white overflow-hidden animate-fade-in" style={{ backgroundColor: '#000000' }}>
       {/* Admin Header */}
-      <div className="h-16 shrink-0 border-b border-neutral-800 flex items-center justify-between px-6 bg-neutral-900">
+      <div className="h-16 shrink-0 border-b border-neutral-800 flex items-center justify-between px-6" style={{ backgroundColor: '#171717' }}>
         <div className="flex items-center gap-4">
             <button 
                 onClick={onExit}
@@ -52,7 +52,7 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden p-6 bg-brand-black">
+      <div className="flex-1 overflow-hidden p-6" style={{ backgroundColor: '#0a0a0a' }}>
          <div className="h-full max-w-7xl mx-auto flex flex-col">
             {tab === 'orders' ? (
                 <OrdersOverview />
