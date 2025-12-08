@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Edit2, User, Users } from 'lucide-react';
 import type { ProductCut, Template } from '../../types';
 
@@ -24,9 +24,17 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   });
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
 
+  useEffect(() => {
+    if (selectedTemplateIndex >= templates.length) {
+      setSelectedTemplateIndex(0);
+    }
+  }, [templates, selectedTemplateIndex]);
+
   const currentCut = cuts[selectedCutSlug];
   const validTemplateIndex = Math.min(selectedTemplateIndex, Math.max(0, templates.length - 1));
-  const currentTemplate = templates.length > 0 ? templates[validTemplateIndex] : null;
+  const currentTemplate = templates.length > 0 && templates[validTemplateIndex]?.colors
+    ? templates[validTemplateIndex]
+    : null;
 
   const garment = garmentType === 'jersey' ? currentCut?.jersey : currentCut?.shorts;
 
