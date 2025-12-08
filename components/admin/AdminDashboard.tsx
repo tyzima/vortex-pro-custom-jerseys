@@ -1,24 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Layout, Database, ShoppingBag, Palette, Package } from 'lucide-react';
-import { LibraryViewer, EditContext } from './LibraryViewer';
-import { TemplateBuilder } from './TemplateBuilder';
+import React, { useState } from 'react';
+import { ArrowLeft, ShoppingBag, Palette } from 'lucide-react';
 import { OrdersOverview } from './OrdersOverview';
 import { TemplateManager } from './TemplateManager';
-import { ProductManager } from './ProductManager';
 
 export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
-  const [tab, setTab] = useState<'orders' | 'library' | 'builder' | 'templates' | 'products'>('templates');
-  const [editContext, setEditContext] = useState<EditContext | null>(null);
-
-  const handleEdit = (context: EditContext) => {
-    setEditContext(context);
-    setTab('builder');
-  };
-
-  const handleBuilderExit = () => {
-    setEditContext(null);
-    setTab('library');
-  };
+  const [tab, setTab] = useState<'orders' | 'templates'>('templates');
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col text-white overflow-hidden animate-fade-in" style={{ backgroundColor: '#000000' }}>
@@ -46,28 +32,12 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
             <ShoppingBag size={14} /> Orders
           </button>
           <button
-            onClick={() => setTab('products')}
-            className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${
-              tab === 'products' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'
-            }`}
-          >
-            <Package size={14} /> Products
-          </button>
-          <button
             onClick={() => setTab('templates')}
             className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${
               tab === 'templates' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'
             }`}
           >
             <Palette size={14} /> Templates
-          </button>
-          <button
-            onClick={() => setTab('library')}
-            className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${
-              tab === 'library' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'
-            }`}
-          >
-            <Database size={14} /> Library View
           </button>
         </div>
       </div>
@@ -77,20 +47,8 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
           <div className="h-full max-w-7xl mx-auto flex flex-col p-6">
             <OrdersOverview />
           </div>
-        ) : tab === 'products' ? (
-          <ProductManager />
-        ) : tab === 'templates' ? (
-          <TemplateManager />
-        ) : tab === 'library' ? (
-          <div className="h-full max-w-7xl mx-auto flex flex-col p-6">
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-              <LibraryViewer onEdit={handleEdit} />
-            </div>
-          </div>
         ) : (
-          <div className="h-full max-w-7xl mx-auto flex flex-col p-6">
-            <TemplateBuilder editContext={editContext} onExit={handleBuilderExit} />
-          </div>
+          <TemplateManager />
         )}
       </div>
     </div>
