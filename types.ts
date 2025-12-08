@@ -83,6 +83,7 @@ export interface ColorOption {
 //    Now supports both jersey and shorts for each cut.
 export interface ProductCut {
   dbId?: string;
+  label: string;
   jersey: {
     shape: { front: string; back: string };
     trim: { front: string; back: string };

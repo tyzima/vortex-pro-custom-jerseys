@@ -184,6 +184,7 @@ export async function getSportDefinition(sportSlug: string): Promise<SportDefini
 
     cutsMap[cut.slug] = {
       dbId: cut.id,
+      label: cut.label,
       jersey: {
         shape: jerseyShape,
         trim: jerseyTrim
