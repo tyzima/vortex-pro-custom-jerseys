@@ -25,16 +25,32 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
 
   const currentCut = cuts[selectedCutSlug];
-  const currentTemplate = templates[selectedTemplateIndex];
+  const validTemplateIndex = Math.min(selectedTemplateIndex, Math.max(0, templates.length - 1));
+  const currentTemplate = templates.length > 0 ? templates[validTemplateIndex] : null;
 
-  const garment = garmentType === 'jersey' ? currentCut.jersey : currentCut.shorts;
+  const garment = garmentType === 'jersey' ? currentCut?.jersey : currentCut?.shorts;
+
+  if (!currentCut || !garment) {
+    return (
+      <div className="h-full bg-neutral-950 flex items-center justify-center">
+        <div className="text-center text-neutral-500">
+          <p className="text-lg">Invalid product configuration</p>
+          <p className="text-sm">Please select a valid product</p>
+        </div>
+      </div>
+    );
+  }
 
   const nextTemplate = () => {
-    setSelectedTemplateIndex((prev) => (prev + 1) % templates.length);
+    if (templates.length > 0) {
+      setSelectedTemplateIndex((prev) => (prev + 1) % templates.length);
+    }
   };
 
   const prevTemplate = () => {
-    setSelectedTemplateIndex((prev) => (prev - 1 + templates.length) % templates.length);
+    if (templates.length > 0) {
+      setSelectedTemplateIndex((prev) => (prev - 1 + templates.length) % templates.length);
+    }
   };
 
   const cutOptions = useMemo(() => {
@@ -238,7 +254,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
                   {currentTemplate.name}
                 </h3>
                 <p className="text-sm text-neutral-400">
-                  Design {selectedTemplateIndex + 1} of {templates.length}
+                  Design {validTemplateIndex + 1} of {templates.length}
                 </p>
               </div>
 
