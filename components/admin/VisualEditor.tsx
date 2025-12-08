@@ -33,7 +33,11 @@ interface SelectedContext {
   template?: Template;
 }
 
-export const VisualEditor: React.FC = () => {
+interface VisualEditorProps {
+  templateId?: string;
+}
+
+export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
   const { library: SPORTS_LIBRARY, loading, refresh } = useTemplateLibrary();
   const [viewSide, setViewSide] = useState<ViewSide>('front');
   const [selectedContext, setSelectedContext] = useState<SelectedContext | null>(null);
@@ -42,6 +46,26 @@ export const VisualEditor: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [showNewTemplateDialog, setShowNewTemplateDialog] = useState(false);
+
+  useEffect(() => {
+    if (templateId && SPORTS_LIBRARY && !loading) {
+      loadTemplateById(templateId);
+    }
+  }, [templateId, SPORTS_LIBRARY, loading]);
+
+  const loadTemplateById = (id: string) => {
+    for (const [sportId, sportData] of Object.entries(SPORTS_LIBRARY)) {
+      for (const [cutSlug, cutData] of Object.entries(sportData.cuts)) {
+        const template = cutData.templates.find((t: Template) => t.id === id);
+        if (template) {
+          setExpandedSports(new Set([sportId]));
+          setExpandedCuts(new Set([`${sportId}-${cutSlug}`]));
+          selectTemplate(sportData, cutSlug, cutData, template);
+          return;
+        }
+      }
+    }
+  };
 
   const toggleSport = (sportId: string) => {
     const newExpanded = new Set(expandedSports);
