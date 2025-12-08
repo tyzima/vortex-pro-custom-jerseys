@@ -28,9 +28,8 @@ type GarmentType = 'jersey' | 'shorts';
 
 interface SelectedContext {
   sport: Sport;
-  cutSlug: string;
-  cut: Cut;
-  template?: Template;
+  template: Template;
+  cutSlug?: string; // Optional: which cut to preview on
 }
 
 interface VisualEditorProps {
@@ -42,10 +41,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
   const [viewSide, setViewSide] = useState<ViewSide>('front');
   const [selectedContext, setSelectedContext] = useState<SelectedContext | null>(null);
   const [expandedSports, setExpandedSports] = useState<Set<string>>(new Set());
-  const [expandedCuts, setExpandedCuts] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [showNewTemplateDialog, setShowNewTemplateDialog] = useState(false);
+  const [newTemplateSportId, setNewTemplateSportId] = useState<string>('');
 
   useEffect(() => {
     if (templateId && SPORTS_LIBRARY && !loading) {
@@ -57,18 +56,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
     if (!SPORTS_LIBRARY) return;
 
     for (const [sportId, sportData] of Object.entries(SPORTS_LIBRARY)) {
-      if (!sportData?.cuts) continue;
+      if (!sportData?.templates) continue;
 
-      for (const [cutSlug, cutData] of Object.entries(sportData.cuts)) {
-        if (!cutData?.templates || !Array.isArray(cutData.templates)) continue;
-
-        const template = cutData.templates.find((t: Template) => t.id === id);
-        if (template) {
-          setExpandedSports(new Set([sportId]));
-          setExpandedCuts(new Set([`${sportId}-${cutSlug}`]));
-          selectTemplate(sportData, cutSlug, cutData, template);
-          return;
-        }
+      const template = sportData.templates.find((t: Template) => t.id === id);
+      if (template) {
+        setExpandedSports(new Set([sportId]));
+        // Pick first available cut as default preview cut
+        const defaultCutSlug = Object.keys(sportData.cuts)[0];
+        selectTemplate(sportData, template, defaultCutSlug);
+        return;
       }
     }
   };
@@ -83,42 +79,24 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
     setExpandedSports(newExpanded);
   };
 
-  const toggleCut = (key: string) => {
-    const newExpanded = new Set(expandedCuts);
-    if (newExpanded.has(key)) {
-      newExpanded.delete(key);
-    } else {
-      newExpanded.add(key);
-    }
-    setExpandedCuts(newExpanded);
-  };
-
-  const selectCut = (sport: Sport, cutSlug: string, cut: Cut) => {
+  const selectTemplate = (sport: Sport, template: Template, cutSlug?: string) => {
+    // Use provided cut or default to first available cut
+    const defaultCutSlug = cutSlug || Object.keys(sport.cuts)[0];
     setSelectedContext({
       sport,
-      cutSlug,
-      cut,
-      template: undefined
+      template,
+      cutSlug: defaultCutSlug
     });
   };
 
-  const selectTemplate = (sport: Sport, cutSlug: string, cut: Cut, template: Template) => {
-    setSelectedContext({
-      sport,
-      cutSlug,
-      cut,
-      template
-    });
-  };
-
-  const handleNewTemplate = async () => {
-    if (!selectedContext || !newTemplateName.trim()) return;
+  const handleNewTemplate = async (sportId: string) => {
+    if (!newTemplateName.trim()) return;
 
     try {
       setUploading(true);
       const newTemplate = await createTemplate(
-        selectedContext.sport.id,
-        selectedContext.cutSlug,
+        sportId,
+        '', // cutSlug is not needed anymore
         newTemplateName.toLowerCase().replace(/\s+/g, '-'),
         newTemplateName.trim()
       );
@@ -127,15 +105,11 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
       setNewTemplateName('');
       setShowNewTemplateDialog(false);
 
-      const refreshedSport = SPORTS_LIBRARY?.[selectedContext.sport.id];
+      const refreshedSport = SPORTS_LIBRARY?.[sportId];
       if (refreshedSport) {
         const template = refreshedSport.templates.find(t => t.id === newTemplate.slug);
         if (template) {
-          setSelectedContext({
-            ...selectedContext,
-            sport: refreshedSport,
-            template
-          });
+          selectTemplate(refreshedSport, template);
         }
       }
     } catch (error) {
@@ -239,70 +213,39 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
                 >
                   {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   <span className="font-bold uppercase text-sm">{sport.label}</span>
+                  <span className="ml-auto text-xs text-neutral-500">{sport.templates.length}</span>
                 </button>
 
                 {isExpanded && (
                   <div className="ml-4 mt-1 space-y-1">
-                    {Object.entries(sport.cuts).map(([cutSlug, cut]) => {
-                      const cutKey = `${sport.id}-${cutSlug}`;
-                      const isCutExpanded = expandedCuts.has(cutKey);
-                      const templates = sport.templates.filter(t => t.id.includes(cutSlug) || true);
+                    {sport.templates.map(template => (
+                      <button
+                        key={template.id}
+                        onClick={() => selectTemplate(sport, template)}
+                        className={`w-full flex items-center gap-2 p-2 rounded transition-colors text-left text-sm ${
+                          selectedContext?.template?.id === template.id
+                            ? 'bg-brand-accent text-black'
+                            : 'hover:bg-neutral-800 text-neutral-400'
+                        }`}
+                      >
+                        <Layers size={14} />
+                        <span>{template.label}</span>
+                        <span className="ml-auto text-[10px] opacity-50">
+                          {template.layers.length} layers
+                        </span>
+                      </button>
+                    ))}
 
-                      return (
-                        <div key={cutSlug}>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => toggleCut(cutKey)}
-                              className="flex-1 flex items-center gap-2 p-2 rounded hover:bg-neutral-800 transition-colors text-left text-sm"
-                            >
-                              {isCutExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                              <Shirt size={14} className="text-neutral-400" />
-                              <span className="text-neutral-300">{cutSlug}</span>
-                            </button>
-                            <button
-                              onClick={() => selectCut(sport, cutSlug, cut)}
-                              className="p-2 hover:bg-brand-accent hover:text-black rounded transition-colors"
-                              title="Edit Cut Paths"
-                            >
-                              <PenLine size={12} />
-                            </button>
-                          </div>
-
-                          {isCutExpanded && (
-                            <div className="ml-6 mt-1 space-y-1">
-                              {templates.map(template => (
-                                <button
-                                  key={template.id}
-                                  onClick={() => selectTemplate(sport, cutSlug, cut, template)}
-                                  className={`w-full flex items-center gap-2 p-2 rounded transition-colors text-left text-xs ${
-                                    selectedContext?.template?.id === template.id
-                                      ? 'bg-brand-accent text-black'
-                                      : 'hover:bg-neutral-800 text-neutral-400'
-                                  }`}
-                                >
-                                  <Layers size={12} />
-                                  <span>{template.label}</span>
-                                  <span className="ml-auto text-[10px] opacity-50">
-                                    {template.layers.length} layers
-                                  </span>
-                                </button>
-                              ))}
-
-                              <button
-                                onClick={() => {
-                                  setSelectedContext({ sport, cutSlug, cut, template: undefined });
-                                  setShowNewTemplateDialog(true);
-                                }}
-                                className="w-full flex items-center gap-2 p-2 rounded border border-dashed border-neutral-700 hover:border-brand-accent hover:text-brand-accent transition-colors text-xs text-neutral-500"
-                              >
-                                <Plus size={12} />
-                                <span>New Template</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    <button
+                      onClick={() => {
+                        setNewTemplateSportId(sport.id);
+                        setShowNewTemplateDialog(true);
+                      }}
+                      className="w-full flex items-center gap-2 p-2 rounded border border-dashed border-neutral-700 hover:border-brand-accent hover:text-brand-accent transition-colors text-sm text-neutral-500"
+                    >
+                      <Plus size={14} />
+                      <span>New Template</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -318,18 +261,17 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
             {selectedContext ? (
               <div>
                 <h3 className="text-2xl font-bold uppercase">
-                  {selectedContext.template
-                    ? selectedContext.template.label
-                    : `${selectedContext.cutSlug} Base Paths`}
+                  {selectedContext.template.label}
                 </h3>
                 <p className="text-sm text-neutral-400">
-                  {selectedContext.sport.label} • {selectedContext.cutSlug}
+                  {selectedContext.sport.label}
+                  {selectedContext.cutSlug && ` • Preview on ${selectedContext.cutSlug}`}
                 </p>
               </div>
             ) : (
               <div>
                 <h3 className="text-2xl font-bold uppercase text-neutral-600">No Selection</h3>
-                <p className="text-sm text-neutral-500">Select a cut or template from the left sidebar</p>
+                <p className="text-sm text-neutral-500">Select a template from the left sidebar</p>
               </div>
             )}
           </div>
@@ -357,7 +299,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
         </div>
 
         <div className="flex-1 overflow-hidden p-8">
-          {selectedContext && (
+          {selectedContext && selectedContext.cutSlug && (
             <div className="h-full grid grid-cols-2 gap-8">
               {/* JERSEY CANVAS */}
               <div className="flex flex-col">
@@ -366,31 +308,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
                 </div>
                 <div className="flex-1 bg-black rounded-xl border-2 border-neutral-800 p-8 flex items-center justify-center">
                   <svg viewBox="0 0 400 500" className="w-full h-full max-w-md max-h-full drop-shadow-2xl">
-                    {!selectedContext.template && (
-                      <>
-                        {selectedContext.cut.jersey.shape[viewSide] && (
-                          <path
-                            d={selectedContext.cut.jersey.shape[viewSide]}
-                            fill="#1a1a1a"
-                            stroke="#333"
-                            strokeWidth="2"
-                          />
-                        )}
-                        {selectedContext.cut.jersey.trim[viewSide] && (
-                          <path
-                            d={selectedContext.cut.jersey.trim[viewSide]}
-                            fill="#D2F802"
-                            stroke="#fff"
-                            strokeWidth="1"
-                            opacity="0.9"
-                          />
-                        )}
-                      </>
-                    )}
-
-                    {selectedContext.template && selectedContext.cut.jersey.shape[viewSide] && (
+                    {selectedContext.sport.cuts[selectedContext.cutSlug]?.jersey.shape[viewSide] && (
                       <path
-                        d={selectedContext.cut.jersey.shape[viewSide]}
+                        d={selectedContext.sport.cuts[selectedContext.cutSlug].jersey.shape[viewSide]}
                         fill="#0a0a0a"
                         stroke="#222"
                         strokeWidth="1"
@@ -398,7 +318,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
                       />
                     )}
 
-                    {selectedContext.template?.layers.map((layer, i) => {
+                    {selectedContext.template.layers.map((layer, i) => {
                       const path = layer.paths.jersey[viewSide];
                       const colors = ['#D2F802', '#60a5fa', '#f97316', '#22c55e', '#db2777', '#a78bfa'];
                       if (!Array.isArray(path)) return null;
@@ -424,31 +344,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
                 </div>
                 <div className="flex-1 bg-black rounded-xl border-2 border-neutral-800 p-8 flex items-center justify-center">
                   <svg viewBox="0 0 400 500" className="w-full h-full max-w-md max-h-full drop-shadow-2xl">
-                    {!selectedContext.template && (
-                      <>
-                        {selectedContext.cut.shorts.shape[viewSide] && (
-                          <path
-                            d={selectedContext.cut.shorts.shape[viewSide]}
-                            fill="#1a1a1a"
-                            stroke="#333"
-                            strokeWidth="2"
-                          />
-                        )}
-                        {selectedContext.cut.shorts.trim[viewSide] && (
-                          <path
-                            d={selectedContext.cut.shorts.trim[viewSide]}
-                            fill="#22c55e"
-                            stroke="#fff"
-                            strokeWidth="1"
-                            opacity="0.9"
-                          />
-                        )}
-                      </>
-                    )}
-
-                    {selectedContext.template && selectedContext.cut.shorts.shape[viewSide] && (
+                    {selectedContext.sport.cuts[selectedContext.cutSlug]?.shorts.shape[viewSide] && (
                       <path
-                        d={selectedContext.cut.shorts.shape[viewSide]}
+                        d={selectedContext.sport.cuts[selectedContext.cutSlug].shorts.shape[viewSide]}
                         fill="#0a0a0a"
                         stroke="#222"
                         strokeWidth="1"
@@ -456,7 +354,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
                       />
                     )}
 
-                    {selectedContext.template?.layers.map((layer, i) => {
+                    {selectedContext.template.layers.map((layer, i) => {
                       const path = layer.paths.shorts[viewSide];
                       const colors = ['#22c55e', '#60a5fa', '#f97316', '#D2F802', '#db2777', '#a78bfa'];
                       if (!Array.isArray(path)) return null;
@@ -496,7 +394,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {selectedContext?.template && (
+          {selectedContext && (
             <>
               <div className="bg-black/50 rounded-lg p-4 border border-neutral-800">
                 <h3 className="text-sm font-bold uppercase text-brand-accent mb-3 flex items-center gap-2">
@@ -570,39 +468,42 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
                   )}
                 </div>
               </div>
-            </>
-          )}
 
-          {selectedContext && !selectedContext.template && (
-            <div className="bg-black/50 rounded-lg p-4 border border-neutral-800">
-              <h3 className="text-sm font-bold uppercase text-white mb-3">Base Cut Paths</h3>
-              <p className="text-xs text-neutral-400 mb-4">
-                These are the foundational shape and trim paths for this cut. To create design variations, add a new template.
-              </p>
-              <button
-                onClick={() => setShowNewTemplateDialog(true)}
-                className="w-full py-2 bg-brand-accent text-black font-bold uppercase text-xs rounded hover:bg-brand-accent/90 transition-colors"
-              >
-                Create New Template
-              </button>
-            </div>
+              {selectedContext.cutSlug && (
+                <div className="bg-black/50 rounded-lg p-4 border border-neutral-800">
+                  <h3 className="text-sm font-bold uppercase text-white mb-3">Preview Cut</h3>
+                  <select
+                    value={selectedContext.cutSlug}
+                    onChange={(e) => selectTemplate(selectedContext.sport, selectedContext.template, e.target.value)}
+                    className="w-full px-3 py-2 bg-black border border-neutral-700 rounded text-white text-xs focus:border-brand-accent outline-none"
+                  >
+                    {Object.keys(selectedContext.sport.cuts).map(cutSlug => (
+                      <option key={cutSlug} value={cutSlug}>{cutSlug}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-neutral-500 mt-2">
+                    Choose which cut style to preview this template on
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           {!selectedContext && (
             <div className="text-center text-neutral-600 py-8">
-              <p className="text-xs">Select a design to see tools</p>
+              <p className="text-xs">Select a template to see tools</p>
             </div>
           )}
         </div>
       </div>
 
       {/* NEW TEMPLATE DIALOG */}
-      {showNewTemplateDialog && selectedContext && (
+      {showNewTemplateDialog && newTemplateSportId && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-md w-full mx-4">
             <h3 className="text-xl font-bold uppercase mb-4">Create New Template</h3>
             <p className="text-sm text-neutral-400 mb-4">
-              Creating template for: <span className="text-white">{selectedContext.sport.label} • {selectedContext.cutSlug}</span>
+              Creating template for: <span className="text-white">{SPORTS_LIBRARY?.[newTemplateSportId]?.label}</span>
             </p>
             <input
               type="text"
@@ -617,6 +518,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
                 onClick={() => {
                   setShowNewTemplateDialog(false);
                   setNewTemplateName('');
+                  setNewTemplateSportId('');
                 }}
                 className="flex-1 px-4 py-2 bg-neutral-800 text-white font-bold uppercase text-sm rounded hover:bg-neutral-700 transition-colors"
                 disabled={uploading}
@@ -624,7 +526,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
                 Cancel
               </button>
               <button
-                onClick={handleNewTemplate}
+                onClick={() => handleNewTemplate(newTemplateSportId)}
                 disabled={!newTemplateName.trim() || uploading}
                 className="flex-1 px-4 py-2 bg-brand-accent text-black font-bold uppercase text-sm rounded hover:bg-brand-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
