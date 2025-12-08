@@ -955,7 +955,7 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                   activePanel === 'layers' ? 'text-brand-accent border-b-2 border-brand-accent' : 'text-neutral-500 hover:text-white'
                 }`}
               >
-                <Layers size={14} /> Layers
+                <Layers size={14} /> {activePanel === 'layers' && 'Layers'}
               </button>
               <button
                 onClick={() => setActivePanel('colors')}
@@ -963,7 +963,7 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                   activePanel === 'colors' ? 'text-brand-accent border-b-2 border-brand-accent' : 'text-neutral-500 hover:text-white'
                 }`}
               >
-                <Palette size={14} /> Colors
+                <Palette size={14} /> {activePanel === 'colors' && 'Colors'}
               </button>
               <button
                 onClick={() => setActivePanel('shapes')}
@@ -971,7 +971,7 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                   activePanel === 'shapes' ? 'text-brand-accent border-b-2 border-brand-accent' : 'text-neutral-500 hover:text-white'
                 }`}
               >
-                <Box size={14} /> Shapes
+                <Box size={14} /> {activePanel === 'shapes' && 'Shapes'}
               </button>
             </div>
           </div>
