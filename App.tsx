@@ -45,10 +45,14 @@ const AppContent = () => {
 
   // Redirect from auth page after successful login
   useEffect(() => {
-    if (user && view === 'auth') {
-      setView('home');
+    if (user && profile && view === 'auth') {
+      if (profile.role === 'admin') {
+        setView('admin');
+      } else {
+        setView('orders');
+      }
     }
-  }, [user, view]);
+  }, [user, profile, view]);
 
   const closeOverlay = () => setActiveOverlay(null);
 
