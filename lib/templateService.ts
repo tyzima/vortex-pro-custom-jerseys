@@ -569,3 +569,94 @@ export async function getTemplateById(templateId: string): Promise<Template & {
     template_layers: (Layer & { layer_paths: LayerPath[] })[]
   };
 }
+
+export interface ProductDetails {
+  id: string;
+  slug: string;
+  label: string;
+  base_price: number;
+  description: string;
+  features: string[];
+  min_quantity: number;
+  production_time: string;
+  is_active: boolean;
+}
+
+export async function getProductDetails(cutId: string): Promise<ProductDetails> {
+  const { data, error } = await supabase
+    .from('product_cuts')
+    .select('id, slug, label, base_price, description, features, min_quantity, production_time, is_active')
+    .eq('id', cutId)
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error(`Product not found: ${cutId}`);
+
+  return {
+    ...data,
+    features: data.features || [],
+    base_price: data.base_price || 49.99,
+    description: data.description || '',
+    min_quantity: data.min_quantity || 1,
+    production_time: data.production_time || '2-3 weeks'
+  } as ProductDetails;
+}
+
+export async function updateProductDetails(
+  cutId: string,
+  data: Partial<Omit<ProductDetails, 'id' | 'slug'>>
+): Promise<ProductDetails> {
+  const { data: product, error } = await supabase
+    .from('product_cuts')
+    .update({
+      ...data,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', cutId)
+    .select('id, slug, label, base_price, description, features, min_quantity, production_time, is_active')
+    .single();
+
+  if (error) throw error;
+  return product as ProductDetails;
+}
+
+export interface TemplateDetails {
+  id: string;
+  slug: string;
+  label: string;
+  description: string;
+  preview_colors: { primary: string; secondary: string; accent: string };
+  is_published: boolean;
+}
+
+export async function getTemplateDetails(templateId: string): Promise<TemplateDetails> {
+  const { data, error } = await supabase
+    .from('sport_templates')
+    .select('id, slug, label, description, preview_colors, is_published')
+    .eq('id', templateId)
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error(`Template not found: ${templateId}`);
+
+  return {
+    ...data,
+    description: data.description || '',
+    preview_colors: data.preview_colors || { primary: '#D2F802', secondary: '#0a0a0a', accent: '#ffffff' }
+  } as TemplateDetails;
+}
+
+export async function updateTemplateDetails(
+  templateId: string,
+  data: Partial<Omit<TemplateDetails, 'id' | 'slug'>>
+): Promise<TemplateDetails> {
+  const { data: template, error } = await supabase
+    .from('sport_templates')
+    .update(data)
+    .eq('id', templateId)
+    .select('id, slug, label, description, preview_colors, is_published')
+    .single();
+
+  if (error) throw error;
+  return template as TemplateDetails;
+}
