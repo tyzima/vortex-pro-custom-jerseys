@@ -30,6 +30,7 @@ import type { ProductCut, DesignTemplate, DesignLayer, SportDefinition } from '.
 interface ProductDesignCanvasProps {
   sport: SportDefinition;
   garmentType: 'jersey' | 'shorts';
+  initialCutSlug?: string;
   onBack: () => void;
   onSave?: (template: DesignTemplate) => void;
 }
@@ -50,10 +51,13 @@ const PRESET_COLORS = [
 export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
   sport,
   garmentType,
+  initialCutSlug,
   onBack,
   onSave
 }) => {
-  const [selectedCutSlug, setSelectedCutSlug] = useState<string>(Object.keys(sport.cuts)[0]);
+  const [selectedCutSlug, setSelectedCutSlug] = useState<string>(
+    initialCutSlug && sport.cuts[initialCutSlug] ? initialCutSlug : Object.keys(sport.cuts)[0]
+  );
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
   const [viewSide, setViewSide] = useState<'front' | 'back' | 'both'>('both');
   const [zoom, setZoom] = useState(100);

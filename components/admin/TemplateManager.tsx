@@ -219,6 +219,7 @@ export const TemplateManager: React.FC = () => {
             templates: sportData.templates
           }}
           garmentType={selectedProduct.garmentType}
+          initialCutSlug={selectedProduct.cutSlug}
           onBack={handleBackToProducts}
         />
       );
