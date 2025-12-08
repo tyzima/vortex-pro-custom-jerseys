@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Plus,
@@ -25,6 +25,8 @@ import {
 import { useTemplateLibrary } from '../../contexts/TemplateLibraryContext';
 import { Template, SportDefinition, ProductCut } from '../../types';
 import { createTemplate } from '../../lib/templateService';
+import { ProductFormModal, Product, Sport as ProductSport } from './ProductFormModal';
+import { supabase } from '../../lib/supabase';
 
 type Sport = SportDefinition;
 import { CanvasViewer } from './CanvasViewer';
@@ -1117,6 +1119,24 @@ const ProductGalleryView: React.FC<{
   onSelectProduct: (sportId: string, sportLabel: string, cutSlug: string, cutLabel: string, garmentType: 'jersey' | 'shorts', cut: ProductCut) => void;
 }> = ({ SPORTS_LIBRARY, searchQuery, setSearchQuery, selectedSport, setSelectedSport, onSelectProduct }) => {
   const [garmentFilter, setGarmentFilter] = useState<'all' | 'jersey' | 'shorts'>('all');
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const [dbSports, setDbSports] = useState<ProductSport[]>([]);
+
+  useEffect(() => {
+    const loadSports = async () => {
+      const { data } = await supabase
+        .from('sports')
+        .select('id, slug, label')
+        .eq('is_active', true)
+        .order('display_order');
+      if (data) setDbSports(data);
+    };
+    loadSports();
+  }, []);
+
+  const handleProductCreated = (product: Product) => {
+    setShowCreateProductModal(false);
+  };
 
   const allProducts = useMemo(() => {
     if (!SPORTS_LIBRARY) return [];
@@ -1218,9 +1238,18 @@ const ProductGalleryView: React.FC<{
                   Browse our collection and select a product to customize
                 </p>
               </div>
-              <div className="text-right">
-                <div className="text-3xl font-black text-brand-accent">{filteredProducts.length}</div>
-                <div className="text-xs text-neutral-500 uppercase tracking-widest">Products</div>
+              <div className="flex items-center gap-6">
+                <button
+                  onClick={() => setShowCreateProductModal(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-brand-accent text-black font-bold text-sm rounded-lg hover:bg-brand-accent/90 transition-colors"
+                >
+                  <Plus size={18} />
+                  Add Product
+                </button>
+                <div className="text-right">
+                  <div className="text-3xl font-black text-brand-accent">{filteredProducts.length}</div>
+                  <div className="text-xs text-neutral-500 uppercase tracking-widest">Products</div>
+                </div>
               </div>
             </div>
 
@@ -1341,6 +1370,15 @@ const ProductGalleryView: React.FC<{
           )}
         </div>
       </div>
+
+      {showCreateProductModal && dbSports.length > 0 && (
+        <ProductFormModal
+          product={null}
+          sports={dbSports}
+          onSave={handleProductCreated}
+          onClose={() => setShowCreateProductModal(false)}
+        />
+      )}
     </div>
   );
 };
