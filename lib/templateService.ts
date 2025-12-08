@@ -183,6 +183,7 @@ export async function getSportDefinition(sportSlug: string): Promise<SportDefini
     };
 
     cutsMap[cut.slug] = {
+      dbId: cut.id,
       jersey: {
         shape: jerseyShape,
         trim: jerseyTrim
@@ -200,6 +201,7 @@ export async function getSportDefinition(sportSlug: string): Promise<SportDefini
 
       return {
         id: layer.layer_slug,
+        dbId: layer.id,
         label: layer.label,
         paths: {
           jersey: {
@@ -216,6 +218,7 @@ export async function getSportDefinition(sportSlug: string): Promise<SportDefini
 
     return {
       id: template.slug,
+      dbId: template.id,
       label: template.label,
       layers
     };
@@ -456,4 +459,43 @@ export async function updateLayerPath(
 
     if (insertError) throw insertError;
   }
+}
+
+export async function getCutById(cutId: string): Promise<Cut & { garment_paths: GarmentPath[] }> {
+  const { data, error } = await supabase
+    .from('product_cuts')
+    .select(`
+      *,
+      garment_paths (*)
+    `)
+    .eq('id', cutId)
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error(`Cut not found: ${cutId}`);
+
+  return data as Cut & { garment_paths: GarmentPath[] };
+}
+
+export async function getTemplateById(templateId: string): Promise<Template & {
+  template_layers: (Layer & { layer_paths: LayerPath[] })[]
+}> {
+  const { data, error } = await supabase
+    .from('sport_templates')
+    .select(`
+      *,
+      template_layers (
+        *,
+        layer_paths (*)
+      )
+    `)
+    .eq('id', templateId)
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error(`Template not found: ${templateId}`);
+
+  return data as Template & {
+    template_layers: (Layer & { layer_paths: LayerPath[] })[]
+  };
 }

@@ -1,775 +1,974 @@
-
 import React, { useState, useEffect } from 'react';
-import { Save, FileUp, ArrowLeft, ArrowRight, Plus, Check, X } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import {
+  ArrowLeft,
+  Upload,
+  Check,
+  X,
+  Shirt,
+  Scissors,
+  Save,
+  AlertCircle,
+  Loader2,
+  Layout
+} from 'lucide-react';
+import { EditContext } from './LibraryViewer';
+import {
+  getSports,
+  getCutById,
+  getTemplateById,
+  createCut,
+  updateCut,
+  updateGarmentPath,
+  createTemplate,
+  updateTemplate,
+  createLayer,
+  updateLayer,
+  updateLayerPath
+} from '../../lib/templateService';
 import { useTemplateLibrary } from '../../contexts/TemplateLibraryContext';
 
-interface ParsedPath {
-  d: string;
-  index: number;
+type BuilderMode = 'cut' | 'template';
+type BuilderStep = 'mode' | 'sport' | 'garments' | 'upload' | 'assign' | 'review';
+
+interface GarmentUpload {
+  jersey?: { front: string; back: string };
+  shorts?: { front: string; back: string };
 }
 
-interface Sport {
+interface PathAssignment {
+  jersey?: {
+    shape: { front: string[]; back: string[] };
+    trim: { front: string[]; back: string[] };
+  };
+  shorts?: {
+    shape: { front: string[]; back: string[] };
+    trim: { front: string[]; back: string[] };
+  };
+}
+
+interface LayerData {
   id: string;
-  slug: string;
+  dbId?: string;
   label: string;
+  paths: {
+    jersey: { front: string[]; back: string[] };
+    shorts: { front: string[]; back: string[] };
+  };
 }
-
-interface Cut {
-  id: string;
-  slug: string;
-  label: string;
-}
-
-type BuilderMode = 'select' | 'cut' | 'template';
-type Step = 'mode' | 'sport' | 'upload' | 'assign' | 'details' | 'review';
 
 interface TemplateBuilderProps {
-  initialData?: { front: string; back: string } | null;
+  editContext: EditContext | null;
+  onExit: () => void;
 }
 
-export const TemplateBuilder: React.FC<TemplateBuilderProps> = ({ initialData }) => {
-  const { user } = useAuth();
+export const TemplateBuilder: React.FC<TemplateBuilderProps> = ({ editContext, onExit }) => {
   const { refresh } = useTemplateLibrary();
-
-  const [mode, setMode] = useState<BuilderMode>('select');
-  const [step, setStep] = useState<Step>('mode');
-
-  const [sports, setSports] = useState<Sport[]>([]);
-  const [cuts, setCuts] = useState<Cut[]>([]);
-  const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
-  const [selectedCut, setSelectedCut] = useState<Cut | null>(null);
-
-  const [frontSvgInput, setFrontSvgInput] = useState('');
-  const [backSvgInput, setBackSvgInput] = useState('');
-  const [frontPaths, setFrontPaths] = useState<ParsedPath[]>([]);
-  const [backPaths, setBackPaths] = useState<ParsedPath[]>([]);
-
-  const [activeSide, setActiveSide] = useState<'front' | 'back'>('front');
-  const [selectedPathIndex, setSelectedPathIndex] = useState<number | null>(null);
-
-  const [pathAssignments, setPathAssignments] = useState<{
-    front: { [index: number]: { type: string; label: string } };
-    back: { [index: number]: { type: string; label: string } };
-  }>({ front: {}, back: {} });
-
-  const [itemSlug, setItemSlug] = useState('');
-  const [itemLabel, setItemLabel] = useState('');
+  const [step, setStep] = useState<BuilderStep>('mode');
+  const [mode, setMode] = useState<BuilderMode>('cut');
+  const [selectedSport, setSelectedSport] = useState<{ id: string; label: string } | null>(null);
+  const [availableSports, setAvailableSports] = useState<Array<{ id: string; label: string }>>([]);
+  const [selectedGarments, setSelectedGarments] = useState<Set<'jersey' | 'shorts'>>(new Set(['jersey']));
+  const [uploads, setUploads] = useState<GarmentUpload>({});
+  const [pathAssignments, setPathAssignments] = useState<PathAssignment>({});
+  const [cutSlug, setCutSlug] = useState('');
+  const [cutLabel, setCutLabel] = useState('');
+  const [templateSlug, setTemplateSlug] = useState('');
+  const [templateLabel, setTemplateLabel] = useState('');
+  const [layers, setLayers] = useState<LayerData[]>([]);
   const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [saveError, setSaveError] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const isEditMode = !!editContext;
 
   useEffect(() => {
-    if (initialData) {
-      setFrontSvgInput(initialData.front);
-      setBackSvgInput(initialData.back);
-    }
-  }, [initialData]);
-
-  useEffect(() => {
-    fetchSports();
+    loadSports();
   }, []);
 
   useEffect(() => {
-    if (frontSvgInput) setFrontPaths(parseSvgPaths(frontSvgInput));
-  }, [frontSvgInput]);
-
-  useEffect(() => {
-    if (backSvgInput) setBackPaths(parseSvgPaths(backSvgInput));
-  }, [backSvgInput]);
-
-  useEffect(() => {
-    if (selectedSport) {
-      fetchCuts(selectedSport.id);
+    if (editContext) {
+      loadEditData();
     }
-  }, [selectedSport]);
+  }, [editContext]);
 
-  const fetchSports = async () => {
-    const { data, error } = await supabase
-      .from('sports')
-      .select('id, slug, label')
-      .order('display_order');
-
-    if (!error && data) {
-      setSports(data);
+  const loadSports = async () => {
+    try {
+      const sports = await getSports();
+      setAvailableSports(sports.map(s => ({ id: s.id, label: s.label })));
+    } catch (err) {
+      setError('Failed to load sports');
     }
   };
 
-  const fetchCuts = async (sportId: string) => {
-    const { data, error } = await supabase
-      .from('product_cuts')
-      .select('id, slug, label')
-      .eq('sport_id', sportId)
-      .order('display_order');
+  const loadEditData = async () => {
+    if (!editContext) return;
 
-    if (!error && data) {
-      setCuts(data);
+    try {
+      setMode(editContext.mode);
+      setSelectedSport({ id: editContext.sportId, label: editContext.sportLabel });
+
+      if (editContext.mode === 'cut' && editContext.cutDbId) {
+        const cutData = await getCutById(editContext.cutDbId);
+        setCutSlug(editContext.cutSlug || '');
+        setCutLabel(editContext.cutLabel || '');
+
+        const jerseyPaths = cutData.garment_paths.filter(p => p.garment_type === 'jersey');
+        const shortsPaths = cutData.garment_paths.filter(p => p.garment_type === 'shorts');
+
+        const hasJersey = jerseyPaths.length > 0;
+        const hasShorts = shortsPaths.length > 0;
+
+        const activeGarments = new Set<'jersey' | 'shorts'>();
+        if (hasJersey) activeGarments.add('jersey');
+        if (hasShorts) activeGarments.add('shorts');
+        setSelectedGarments(activeGarments);
+
+        const assignments: PathAssignment = {};
+
+        if (hasJersey) {
+          assignments.jersey = {
+            shape: {
+              front: jerseyPaths.filter(p => p.path_type === 'shape' && p.side === 'front').map(p => p.svg_path),
+              back: jerseyPaths.filter(p => p.path_type === 'shape' && p.side === 'back').map(p => p.svg_path)
+            },
+            trim: {
+              front: jerseyPaths.filter(p => p.path_type === 'trim' && p.side === 'front').map(p => p.svg_path),
+              back: jerseyPaths.filter(p => p.path_type === 'trim' && p.side === 'back').map(p => p.svg_path)
+            }
+          };
+        }
+
+        if (hasShorts) {
+          assignments.shorts = {
+            shape: {
+              front: shortsPaths.filter(p => p.path_type === 'shape' && p.side === 'front').map(p => p.svg_path),
+              back: shortsPaths.filter(p => p.path_type === 'shape' && p.side === 'back').map(p => p.svg_path)
+            },
+            trim: {
+              front: shortsPaths.filter(p => p.path_type === 'trim' && p.side === 'front').map(p => p.svg_path),
+              back: shortsPaths.filter(p => p.path_type === 'trim' && p.side === 'back').map(p => p.svg_path)
+            }
+          };
+        }
+
+        setPathAssignments(assignments);
+        setStep('review');
+      } else if (editContext.mode === 'template' && editContext.templateDbId) {
+        const templateData = await getTemplateById(editContext.templateDbId);
+        setTemplateSlug(editContext.templateSlug || '');
+        setTemplateLabel(editContext.templateLabel || '');
+
+        const loadedLayers: LayerData[] = templateData.template_layers.map(layer => {
+          const layerPaths = layer.layer_paths || [];
+          return {
+            id: layer.layer_slug,
+            dbId: layer.id,
+            label: layer.label,
+            paths: {
+              jersey: {
+                front: layerPaths.filter(p => p.garment_type === 'jersey' && p.side === 'front').map(p => p.svg_path),
+                back: layerPaths.filter(p => p.garment_type === 'jersey' && p.side === 'back').map(p => p.svg_path)
+              },
+              shorts: {
+                front: layerPaths.filter(p => p.garment_type === 'shorts' && p.side === 'front').map(p => p.svg_path),
+                back: layerPaths.filter(p => p.garment_type === 'shorts' && p.side === 'back').map(p => p.svg_path)
+              }
+            }
+          };
+        });
+
+        const hasJersey = loadedLayers.some(l => l.paths.jersey.front.length > 0 || l.paths.jersey.back.length > 0);
+        const hasShorts = loadedLayers.some(l => l.paths.shorts.front.length > 0 || l.paths.shorts.back.length > 0);
+
+        const activeGarments = new Set<'jersey' | 'shorts'>();
+        if (hasJersey) activeGarments.add('jersey');
+        if (hasShorts) activeGarments.add('shorts');
+        setSelectedGarments(activeGarments);
+
+        setLayers(loadedLayers);
+        setStep('review');
+      }
+    } catch (err) {
+      setError(`Failed to load ${editContext.mode} data: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
-  const parseSvgPaths = (svgString: string): ParsedPath[] => {
+  const extractPathsFromSVG = (svgString: string): string[] => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgString, 'image/svg+xml');
-    const paths = Array.from(doc.querySelectorAll('path'));
-    return paths.map((p, i) => ({ d: p.getAttribute('d') || '', index: i })).filter(p => p.d);
+    const paths = doc.querySelectorAll('path');
+    return Array.from(paths).map(p => p.getAttribute('d') || '').filter(d => d.length > 0);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleFileUpload = (garment: 'jersey' | 'shorts', side: 'front' | 'back', file: File) => {
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (side === 'front') {
-        setFrontSvgInput(result);
-      } else {
-        setBackSvgInput(result);
-      }
+    reader.onload = (e) => {
+      const svgContent = e.target?.result as string;
+      setUploads(prev => ({
+        ...prev,
+        [garment]: {
+          ...prev[garment],
+          [side]: svgContent
+        }
+      }));
     };
     reader.readAsText(file);
-    e.target.value = '';
   };
 
-  const handlePathClick = (index: number) => {
-    setSelectedPathIndex(index);
-  };
+  const processUploads = () => {
+    const assignments: PathAssignment = {};
 
-  const assignPath = (type: string, label: string) => {
-    if (selectedPathIndex === null) return;
+    if (uploads.jersey?.front || uploads.jersey?.back) {
+      const frontPaths = uploads.jersey.front ? extractPathsFromSVG(uploads.jersey.front) : [];
+      const backPaths = uploads.jersey.back ? extractPathsFromSVG(uploads.jersey.back) : [];
+      assignments.jersey = {
+        shape: { front: frontPaths, back: backPaths },
+        trim: { front: [], back: [] }
+      };
+    }
 
-    setPathAssignments(prev => ({
-      ...prev,
-      [activeSide]: {
-        ...prev[activeSide],
-        [selectedPathIndex]: { type, label }
+    if (uploads.shorts?.front || uploads.shorts?.back) {
+      const frontPaths = uploads.shorts.front ? extractPathsFromSVG(uploads.shorts.front) : [];
+      const backPaths = uploads.shorts.back ? extractPathsFromSVG(uploads.shorts.back) : [];
+      assignments.shorts = {
+        shape: { front: frontPaths, back: backPaths },
+        trim: { front: [], back: [] }
+      };
+    }
+
+    setPathAssignments(assignments);
+    if (mode === 'cut') {
+      setStep('assign');
+    } else {
+      const newLayers: LayerData[] = [];
+      if (assignments.jersey) {
+        newLayers.push({
+          id: 'layer_1',
+          label: 'Layer 1',
+          paths: {
+            jersey: assignments.jersey.shape,
+            shorts: { front: [], back: [] }
+          }
+        });
       }
-    }));
-
-    setSelectedPathIndex(null);
+      if (assignments.shorts && !newLayers.length) {
+        newLayers.push({
+          id: 'layer_1',
+          label: 'Layer 1',
+          paths: {
+            jersey: { front: [], back: [] },
+            shorts: assignments.shorts.shape
+          }
+        });
+      }
+      setLayers(newLayers);
+      setStep('review');
+    }
   };
 
-  const removePath = (side: 'front' | 'back', index: number) => {
+  const movePath = (
+    garment: 'jersey' | 'shorts',
+    fromType: 'shape' | 'trim',
+    toType: 'shape' | 'trim',
+    side: 'front' | 'back',
+    pathIndex: number
+  ) => {
     setPathAssignments(prev => {
-      const newSide = { ...prev[side] };
-      delete newSide[index];
-      return { ...prev, [side]: newSide };
+      const garmentData = prev[garment];
+      if (!garmentData) return prev;
+
+      const fromArray = [...garmentData[fromType][side]];
+      const toArray = [...garmentData[toType][side]];
+      const [movedPath] = fromArray.splice(pathIndex, 1);
+      toArray.push(movedPath);
+
+      return {
+        ...prev,
+        [garment]: {
+          ...garmentData,
+          [fromType]: { ...garmentData[fromType], [side]: fromArray },
+          [toType]: { ...garmentData[toType], [side]: toArray }
+        }
+      };
     });
   };
 
-  const saveCut = async () => {
-    if (!selectedSport || !itemSlug || !itemLabel) return;
+  const handleSaveCut = async () => {
+    if (!selectedSport || !cutSlug || !cutLabel) {
+      setError('Sport, slug, and label are required');
+      return;
+    }
 
     setSaving(true);
-    setSaveError('');
+    setError(null);
 
     try {
-      const { data: cutData, error: cutError } = await supabase
-        .from('product_cuts')
-        .insert({
-          sport_id: selectedSport.id,
-          slug: itemSlug,
-          label: itemLabel,
-          display_order: 0,
-          is_active: true
-        })
-        .select()
-        .single();
+      let cutId: string;
 
-      if (cutError) throw cutError;
+      if (isEditMode && editContext.cutDbId) {
+        await updateCut(editContext.cutDbId, { slug: cutSlug, label: cutLabel });
+        cutId = editContext.cutDbId;
+      } else {
+        const newCut = await createCut(selectedSport.id, {
+          slug: cutSlug,
+          label: cutLabel,
+          display_order: 0
+        });
+        cutId = newCut.id;
+      }
 
-      const garmentPaths = [];
-
-      for (const [index, assignment] of Object.entries(pathAssignments.front)) {
-        const pathData = frontPaths[Number(index)];
-        if (pathData && assignment.type) {
-          garmentPaths.push({
-            cut_id: cutData.id,
-            garment_type: 'jersey',
-            path_type: assignment.type,
-            side: 'front',
-            svg_path: pathData.d
-          });
+      if (pathAssignments.jersey) {
+        for (const path of pathAssignments.jersey.shape.front) {
+          await updateGarmentPath(cutId, 'jersey', 'shape', 'front', path);
+        }
+        for (const path of pathAssignments.jersey.shape.back) {
+          await updateGarmentPath(cutId, 'jersey', 'shape', 'back', path);
+        }
+        for (const path of pathAssignments.jersey.trim.front) {
+          await updateGarmentPath(cutId, 'jersey', 'trim', 'front', path);
+        }
+        for (const path of pathAssignments.jersey.trim.back) {
+          await updateGarmentPath(cutId, 'jersey', 'trim', 'back', path);
         }
       }
 
-      for (const [index, assignment] of Object.entries(pathAssignments.back)) {
-        const pathData = backPaths[Number(index)];
-        if (pathData && assignment.type) {
-          garmentPaths.push({
-            cut_id: cutData.id,
-            garment_type: 'jersey',
-            path_type: assignment.type,
-            side: 'back',
-            svg_path: pathData.d
-          });
+      if (pathAssignments.shorts) {
+        for (const path of pathAssignments.shorts.shape.front) {
+          await updateGarmentPath(cutId, 'shorts', 'shape', 'front', path);
+        }
+        for (const path of pathAssignments.shorts.shape.back) {
+          await updateGarmentPath(cutId, 'shorts', 'shape', 'back', path);
+        }
+        for (const path of pathAssignments.shorts.trim.front) {
+          await updateGarmentPath(cutId, 'shorts', 'trim', 'front', path);
+        }
+        for (const path of pathAssignments.shorts.trim.back) {
+          await updateGarmentPath(cutId, 'shorts', 'trim', 'back', path);
         }
       }
 
-      if (garmentPaths.length > 0) {
-        const { error: pathsError } = await supabase
-          .from('garment_paths')
-          .insert(garmentPaths);
-
-        if (pathsError) throw pathsError;
-      }
-
-      setSaveSuccess(true);
       await refresh();
+      setSuccess(true);
       setTimeout(() => {
-        resetBuilder();
+        onExit();
       }, 2000);
-
-    } catch (error: any) {
-      setSaveError(error.message || 'Failed to save cut');
+    } catch (err) {
+      setError(`Failed to save cut: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
     }
   };
 
-  const saveTemplate = async () => {
-    if (!selectedSport || !selectedCut || !itemSlug || !itemLabel) return;
+  const handleSaveTemplate = async () => {
+    if (!selectedSport || !templateSlug || !templateLabel || layers.length === 0) {
+      setError('Sport, slug, label, and at least one layer are required');
+      return;
+    }
 
     setSaving(true);
-    setSaveError('');
+    setError(null);
 
     try {
-      const { data: templateData, error: templateError } = await supabase
-        .from('sport_templates')
-        .insert({
+      let templateId: string;
+
+      if (isEditMode && editContext.templateDbId) {
+        await updateTemplate(editContext.templateDbId, {
+          slug: templateSlug,
+          label: templateLabel
+        });
+        templateId = editContext.templateDbId;
+      } else {
+        const newTemplate = await createTemplate({
           sport_id: selectedSport.id,
-          slug: itemSlug,
-          label: itemLabel,
+          slug: templateSlug,
+          label: templateLabel,
           display_order: 0,
-          is_published: true,
-          created_by: user?.id
-        })
-        .select()
-        .single();
+          is_published: true
+        });
+        templateId = newTemplate.id;
+      }
 
-      if (templateError) throw templateError;
+      for (let i = 0; i < layers.length; i++) {
+        const layer = layers[i];
+        let layerId: string;
 
-      const layerTypes = new Set<string>();
-      Object.values(pathAssignments.front).forEach(a => layerTypes.add(a.type));
-      Object.values(pathAssignments.back).forEach(a => layerTypes.add(a.type));
-
-      for (const layerType of layerTypes) {
-        const layerLabel = pathAssignments.front[
-          Object.keys(pathAssignments.front).find(k => pathAssignments.front[Number(k)].type === layerType) as any
-        ]?.label || layerType;
-
-        const { data: layerData, error: layerError } = await supabase
-          .from('template_layers')
-          .insert({
-            template_id: templateData.id,
-            layer_slug: layerType,
-            label: layerLabel,
-            display_order: 0
-          })
-          .select()
-          .single();
-
-        if (layerError) throw layerError;
-
-        const layerPaths = [];
-
-        for (const [index, assignment] of Object.entries(pathAssignments.front)) {
-          if (assignment.type === layerType) {
-            const pathData = frontPaths[Number(index)];
-            if (pathData) {
-              layerPaths.push({
-                layer_id: layerData.id,
-                garment_type: 'jersey',
-                side: 'front',
-                svg_path: pathData.d
-              });
-            }
-          }
+        if (layer.dbId) {
+          await updateLayer(layer.dbId, {
+            layer_slug: layer.id,
+            label: layer.label,
+            display_order: i
+          });
+          layerId = layer.dbId;
+        } else {
+          const newLayer = await createLayer(templateId, {
+            layer_slug: layer.id,
+            label: layer.label,
+            display_order: i
+          });
+          layerId = newLayer.id;
         }
 
-        for (const [index, assignment] of Object.entries(pathAssignments.back)) {
-          if (assignment.type === layerType) {
-            const pathData = backPaths[Number(index)];
-            if (pathData) {
-              layerPaths.push({
-                layer_id: layerData.id,
-                garment_type: 'jersey',
-                side: 'back',
-                svg_path: pathData.d
-              });
-            }
-          }
+        for (const path of layer.paths.jersey.front) {
+          await updateLayerPath(layerId, 'jersey', 'front', path);
         }
-
-        if (layerPaths.length > 0) {
-          const { error: pathsError } = await supabase
-            .from('layer_paths')
-            .insert(layerPaths);
-
-          if (pathsError) throw pathsError;
+        for (const path of layer.paths.jersey.back) {
+          await updateLayerPath(layerId, 'jersey', 'back', path);
+        }
+        for (const path of layer.paths.shorts.front) {
+          await updateLayerPath(layerId, 'shorts', 'front', path);
+        }
+        for (const path of layer.paths.shorts.back) {
+          await updateLayerPath(layerId, 'shorts', 'back', path);
         }
       }
 
-      setSaveSuccess(true);
       await refresh();
+      setSuccess(true);
       setTimeout(() => {
-        resetBuilder();
+        onExit();
       }, 2000);
-
-    } catch (error: any) {
-      setSaveError(error.message || 'Failed to save template');
+    } catch (err) {
+      setError(`Failed to save template: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
     }
   };
 
-  const resetBuilder = () => {
-    setMode('select');
-    setStep('mode');
-    setSelectedSport(null);
-    setSelectedCut(null);
-    setFrontSvgInput('');
-    setBackSvgInput('');
-    setFrontPaths([]);
-    setBackPaths([]);
-    setPathAssignments({ front: {}, back: {} });
-    setItemSlug('');
-    setItemLabel('');
-    setSaveSuccess(false);
-    setSaveError('');
+  const addLayer = () => {
+    const layerId = `layer_${Date.now()}`;
+    setLayers([
+      ...layers,
+      {
+        id: layerId,
+        label: `Layer ${layers.length + 1}`,
+        paths: {
+          jersey: { front: [], back: [] },
+          shorts: { front: [], back: [] }
+        }
+      }
+    ]);
   };
 
-  const activePaths = activeSide === 'front' ? frontPaths : backPaths;
-  const activeAssignments = pathAssignments[activeSide];
+  const removeLayer = (index: number) => {
+    setLayers(layers.filter((_, i) => i !== index));
+  };
 
-  if (saveSuccess) {
+  const updateLayerLabel = (index: number, label: string) => {
+    const updated = [...layers];
+    updated[index].label = label;
+    setLayers(updated);
+  };
+
+  if (success) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Check size={32} className="text-green-500" />
-          </div>
-          <h3 className="text-white text-xl font-bold uppercase mb-2">Saved Successfully!</h3>
-          <p className="text-neutral-400">Your {mode === 'cut' ? 'cut' : 'template'} has been added to the library.</p>
+          <Check className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">
+            {isEditMode ? 'Updated' : 'Created'} Successfully!
+          </h2>
+          <p className="text-neutral-400">Returning to library...</p>
         </div>
       </div>
     );
   }
 
-  if (step === 'mode') {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="max-w-2xl w-full space-y-6">
-          <div className="text-center mb-8">
-            <h2 className="text-white text-2xl font-bold uppercase mb-2">What would you like to create?</h2>
-            <p className="text-neutral-400 text-sm">Choose between creating a new base cut or a design template</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-            <button
-              onClick={() => {
-                setMode('cut');
-                setStep('sport');
-              }}
-              className="bg-neutral-900 border-2 border-neutral-800 hover:border-brand-accent rounded-xl p-8 text-left transition-all group"
-            >
-              <div className="text-4xl mb-4">👕</div>
-              <h3 className="text-white text-xl font-bold uppercase mb-2 group-hover:text-brand-accent transition-colors">New Cut</h3>
-              <p className="text-neutral-400 text-sm">Create a base jersey shape with trim paths for a sport</p>
-            </button>
-
-            <button
-              onClick={() => {
-                setMode('template');
-                setStep('sport');
-              }}
-              className="bg-neutral-900 border-2 border-neutral-800 hover:border-brand-accent rounded-xl p-8 text-left transition-all group"
-            >
-              <div className="text-4xl mb-4">🎨</div>
-              <h3 className="text-white text-xl font-bold uppercase mb-2 group-hover:text-brand-accent transition-colors">New Template</h3>
-              <p className="text-neutral-400 text-sm">Create a design template with customizable layers for an existing cut</p>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 'sport') {
-    return (
-      <div className="h-full flex flex-col">
-        <div className="mb-6">
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-neutral-800">
+        <div className="flex items-center gap-4">
           <button
-            onClick={() => setStep('mode')}
-            className="text-neutral-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest flex items-center gap-2"
+            onClick={onExit}
+            className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest"
           >
-            <ArrowLeft size={14} /> Back
+            <ArrowLeft size={16} /> {isEditMode ? 'Cancel Edit' : 'Back'}
+          </button>
+          <div className="h-6 w-px bg-neutral-800" />
+          <h2 className="text-2xl font-bold text-white uppercase">
+            {isEditMode
+              ? `Editing: ${editContext.mode === 'cut' ? editContext.cutLabel : editContext.templateLabel}`
+              : 'Template Builder'}
+          </h2>
+        </div>
+        {!isEditMode && (
+          <div className="flex gap-2">
+            {['mode', 'sport', 'garments', 'upload', 'assign', 'review'].map((s, i) => (
+              <div
+                key={s}
+                className={`w-8 h-1 rounded ${
+                  ['mode', 'sport', 'garments', 'upload', 'assign', 'review'].indexOf(step) >= i
+                    ? 'bg-brand-accent'
+                    : 'bg-neutral-800'
+                }`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-900/20 border border-red-500 rounded-lg flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <p className="text-red-400 flex-1">{error}</p>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400">
+            <X size={16} />
           </button>
         </div>
+      )}
 
-        <div className="flex-1 flex items-center justify-center">
-          <div className="max-w-2xl w-full space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-white text-2xl font-bold uppercase mb-2">Select Sport</h2>
-              <p className="text-neutral-400 text-sm">Choose which sport this {mode} belongs to</p>
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {step === 'mode' && !isEditMode && (
+          <div className="max-w-2xl mx-auto py-12">
+            <h3 className="text-xl font-bold text-white mb-6 text-center uppercase">Select Builder Mode</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <button
+                onClick={() => {
+                  setMode('cut');
+                  setStep('sport');
+                }}
+                className="p-8 bg-neutral-900 border-2 border-neutral-800 hover:border-brand-accent rounded-lg transition-all"
+              >
+                <Shirt className="w-12 h-12 text-brand-accent mx-auto mb-4" />
+                <h4 className="text-lg font-bold text-white mb-2">Product Cut</h4>
+                <p className="text-sm text-neutral-400">Define garment shapes and silhouettes</p>
+              </button>
+              <button
+                onClick={() => {
+                  setMode('template');
+                  setStep('sport');
+                }}
+                className="p-8 bg-neutral-900 border-2 border-neutral-800 hover:border-brand-accent rounded-lg transition-all"
+              >
+                <Layout className="w-12 h-12 text-brand-accent mx-auto mb-4" />
+                <h4 className="text-lg font-bold text-white mb-2">Design Template</h4>
+                <p className="text-sm text-neutral-400">Create layered design patterns</p>
+              </button>
             </div>
+          </div>
+        )}
 
-            <div className="grid grid-cols-3 gap-4">
-              {sports.map(sport => (
+        {step === 'sport' && (
+          <div className="max-w-2xl mx-auto py-12">
+            <h3 className="text-xl font-bold text-white mb-6 text-center uppercase">Select Sport</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {availableSports.map(sport => (
                 <button
                   key={sport.id}
                   onClick={() => {
                     setSelectedSport(sport);
-                    if (mode === 'cut') {
-                      setStep('upload');
-                    } else {
-                      setStep('details');
-                    }
+                    setStep('garments');
                   }}
-                  className="bg-neutral-900 border-2 border-neutral-800 hover:border-brand-accent rounded-xl p-6 text-center transition-all"
+                  className="p-6 bg-neutral-900 border-2 border-neutral-800 hover:border-brand-accent rounded-lg transition-all text-white font-bold uppercase"
                 >
-                  <h3 className="text-white font-bold uppercase">{sport.label}</h3>
+                  {sport.label}
                 </button>
               ))}
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
+        )}
 
-  if (step === 'details' && mode === 'template') {
-    return (
-      <div className="h-full flex flex-col">
-        <div className="mb-6">
-          <button
-            onClick={() => setStep('sport')}
-            className="text-neutral-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest flex items-center gap-2"
-          >
-            <ArrowLeft size={14} /> Back
-          </button>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center">
-          <div className="max-w-md w-full space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-white text-2xl font-bold uppercase mb-2">Select Base Cut</h2>
-              <p className="text-neutral-400 text-sm">Choose which cut this template uses</p>
-            </div>
-
-            <div className="space-y-3">
-              {cuts.map(cut => (
-                <button
-                  key={cut.id}
-                  onClick={() => {
-                    setSelectedCut(cut);
-                    setStep('upload');
-                  }}
-                  className="w-full bg-neutral-900 border-2 border-neutral-800 hover:border-brand-accent rounded-xl p-4 text-left transition-all"
-                >
-                  <h3 className="text-white font-bold uppercase">{cut.label}</h3>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 'upload') {
-    return (
-      <div className="h-full flex flex-col">
-        <div className="mb-6">
-          <button
-            onClick={() => setStep(mode === 'cut' ? 'sport' : 'details')}
-            className="text-neutral-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest flex items-center gap-2"
-          >
-            <ArrowLeft size={14} /> Back
-          </button>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center">
-          <div className="max-w-2xl w-full space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-white text-2xl font-bold uppercase mb-2">Upload SVG Files</h2>
-              <p className="text-neutral-400 text-sm">Upload or paste the front and back SVG paths</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-brand-accent font-bold uppercase text-xs">Front</h3>
-                  <label className="cursor-pointer text-[10px] bg-neutral-800 hover:bg-brand-accent hover:text-black px-2 py-1 rounded flex items-center gap-1 text-neutral-300 transition-colors">
-                    <FileUp size={10} />
-                    Import
-                    <input type="file" accept=".svg" className="hidden" onChange={(e) => handleFileUpload(e, 'front')} />
-                  </label>
-                </div>
-                <textarea
-                  value={frontSvgInput}
-                  onChange={e => setFrontSvgInput(e.target.value)}
-                  className="w-full h-48 bg-black border border-neutral-700 rounded p-2 text-[10px] font-mono text-neutral-400 focus:border-brand-accent outline-none"
-                  placeholder="Paste SVG code..."
-                />
-                {frontPaths.length > 0 && (
-                  <p className="text-xs text-green-500 mt-2">✓ {frontPaths.length} paths detected</p>
-                )}
-              </div>
-
-              <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-brand-accent font-bold uppercase text-xs">Back</h3>
-                  <label className="cursor-pointer text-[10px] bg-neutral-800 hover:bg-brand-accent hover:text-black px-2 py-1 rounded flex items-center gap-1 text-neutral-300 transition-colors">
-                    <FileUp size={10} />
-                    Import
-                    <input type="file" accept=".svg" className="hidden" onChange={(e) => handleFileUpload(e, 'back')} />
-                  </label>
-                </div>
-                <textarea
-                  value={backSvgInput}
-                  onChange={e => setBackSvgInput(e.target.value)}
-                  className="w-full h-48 bg-black border border-neutral-700 rounded p-2 text-[10px] font-mono text-neutral-400 focus:border-brand-accent outline-none"
-                  placeholder="Paste SVG code..."
-                />
-                {backPaths.length > 0 && (
-                  <p className="text-xs text-green-500 mt-2">✓ {backPaths.length} paths detected</p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end">
+        {step === 'garments' && (
+          <div className="max-w-2xl mx-auto py-12">
+            <h3 className="text-xl font-bold text-white mb-6 text-center uppercase">
+              Select Garment Types
+            </h3>
+            <p className="text-neutral-400 text-center mb-8">Choose which garments to configure</p>
+            <div className="grid grid-cols-2 gap-6 mb-8">
               <button
-                onClick={() => setStep('assign')}
-                disabled={frontPaths.length === 0 || backPaths.length === 0}
-                className="bg-brand-accent disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold uppercase text-sm px-6 py-3 rounded-lg hover:bg-white transition-colors flex items-center gap-2"
+                onClick={() => {
+                  const updated = new Set(selectedGarments);
+                  if (updated.has('jersey')) {
+                    if (updated.size > 1) updated.delete('jersey');
+                  } else {
+                    updated.add('jersey');
+                  }
+                  setSelectedGarments(updated);
+                }}
+                className={`p-8 border-2 rounded-lg transition-all ${
+                  selectedGarments.has('jersey')
+                    ? 'bg-brand-accent/10 border-brand-accent'
+                    : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
+                }`}
               >
-                Next: Assign Paths <ArrowRight size={16} />
+                <Shirt className="w-12 h-12 text-brand-accent mx-auto mb-4" />
+                <h4 className="text-lg font-bold text-white">Jersey</h4>
+              </button>
+              <button
+                onClick={() => {
+                  const updated = new Set(selectedGarments);
+                  if (updated.has('shorts')) {
+                    if (updated.size > 1) updated.delete('shorts');
+                  } else {
+                    updated.add('shorts');
+                  }
+                  setSelectedGarments(updated);
+                }}
+                className={`p-8 border-2 rounded-lg transition-all ${
+                  selectedGarments.has('shorts')
+                    ? 'bg-green-500/10 border-green-500'
+                    : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
+                }`}
+              >
+                <Scissors className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                <h4 className="text-lg font-bold text-white">Shorts</h4>
+              </button>
+            </div>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setStep('upload')}
+                disabled={selectedGarments.size === 0}
+                className="px-8 py-3 bg-brand-accent text-black font-bold uppercase rounded-lg hover:bg-brand-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Continue
               </button>
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
+        )}
 
-  if (step === 'assign') {
-    const pathTypes = mode === 'cut'
-      ? [
-          { value: 'shape', label: 'Jersey Shape' },
-          { value: 'trim', label: 'Jersey Trim' }
-        ]
-      : [
-          { value: 'primary', label: 'Primary Layer' },
-          { value: 'secondary', label: 'Secondary Layer' },
-          { value: 'accent', label: 'Accent Layer' },
-          { value: 'stripe', label: 'Stripe Layer' },
-          { value: 'panel', label: 'Side Panel' }
-        ];
-
-    return (
-      <div className="h-full flex flex-col">
-        <div className="flex justify-between items-center mb-6">
-          <button
-            onClick={() => setStep('upload')}
-            className="text-neutral-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest flex items-center gap-2"
-          >
-            <ArrowLeft size={14} /> Back
-          </button>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveSide('front')}
-              className={`px-4 py-1 rounded-full text-xs font-bold uppercase transition-colors ${activeSide === 'front' ? 'bg-brand-accent text-black' : 'bg-neutral-800 text-neutral-400'}`}
-            >
-              Front
-            </button>
-            <button
-              onClick={() => setActiveSide('back')}
-              className={`px-4 py-1 rounded-full text-xs font-bold uppercase transition-colors ${activeSide === 'back' ? 'bg-brand-accent text-black' : 'bg-neutral-800 text-neutral-400'}`}
-            >
-              Back
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
-          <div className="col-span-2 bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col">
-            <h3 className="text-brand-accent font-bold uppercase text-xs mb-4">Click paths to select, then assign a type</h3>
-
-            <div className="flex-1 flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] rounded-lg">
-              <div className="w-full h-full max-w-md p-8">
-                <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-2xl">
-                  {activePaths.map((path) => {
-                    const isSelected = selectedPathIndex === path.index;
-                    const assignment = activeAssignments[path.index];
-
-                    return (
-                      <path
-                        key={path.index}
-                        d={path.d}
-                        fill={isSelected ? '#D2F802' : (assignment ? '#ffffff' : '#333333')}
-                        stroke={isSelected ? '#fff' : (assignment ? '#D2F802' : '#555')}
-                        strokeWidth={isSelected ? 4 : 1}
-                        className="cursor-pointer hover:opacity-80 transition-all"
-                        onClick={() => handlePathClick(path.index)}
+        {step === 'upload' && (
+          <div className="max-w-4xl mx-auto py-12">
+            <h3 className="text-xl font-bold text-white mb-6 text-center uppercase">Upload SVG Files</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {selectedGarments.has('jersey') && (
+                <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+                  <h4 className="text-brand-accent font-bold uppercase mb-4 flex items-center gap-2">
+                    <Shirt size={16} /> Jersey
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-neutral-400 mb-2">Front View</label>
+                      <input
+                        type="file"
+                        accept=".svg"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload('jersey', 'front', file);
+                        }}
+                        className="w-full text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-brand-accent file:text-black hover:file:bg-brand-accent/90"
                       />
-                    );
-                  })}
-                </svg>
-              </div>
+                      {uploads.jersey?.front && (
+                        <div className="mt-2 text-xs text-green-500 flex items-center gap-1">
+                          <Check size={12} /> Uploaded ({extractPathsFromSVG(uploads.jersey.front).length} paths)
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm text-neutral-400 mb-2">Back View</label>
+                      <input
+                        type="file"
+                        accept=".svg"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload('jersey', 'back', file);
+                        }}
+                        className="w-full text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-brand-accent file:text-black hover:file:bg-brand-accent/90"
+                      />
+                      {uploads.jersey?.back && (
+                        <div className="mt-2 text-xs text-green-500 flex items-center gap-1">
+                          <Check size={12} /> Uploaded ({extractPathsFromSVG(uploads.jersey.back).length} paths)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedGarments.has('shorts') && (
+                <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+                  <h4 className="text-green-500 font-bold uppercase mb-4 flex items-center gap-2">
+                    <Scissors size={16} /> Shorts
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-neutral-400 mb-2">Front View</label>
+                      <input
+                        type="file"
+                        accept=".svg"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload('shorts', 'front', file);
+                        }}
+                        className="w-full text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-500 file:text-black hover:file:bg-green-400"
+                      />
+                      {uploads.shorts?.front && (
+                        <div className="mt-2 text-xs text-green-500 flex items-center gap-1">
+                          <Check size={12} /> Uploaded ({extractPathsFromSVG(uploads.shorts.front).length} paths)
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm text-neutral-400 mb-2">Back View</label>
+                      <input
+                        type="file"
+                        accept=".svg"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload('shorts', 'back', file);
+                        }}
+                        className="w-full text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-500 file:text-black hover:file:bg-green-400"
+                      />
+                      {uploads.shorts?.back && (
+                        <div className="mt-2 text-xs text-green-500 flex items-center gap-1">
+                          <Check size={12} /> Uploaded ({extractPathsFromSVG(uploads.shorts.back).length} paths)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={processUploads}
+                className="px-8 py-3 bg-brand-accent text-black font-bold uppercase rounded-lg hover:bg-brand-accent/90 transition-colors flex items-center gap-2"
+              >
+                <Upload size={16} />
+                Process & Continue
+              </button>
             </div>
           </div>
+        )}
 
-          <div className="space-y-4 overflow-y-auto">
-            {selectedPathIndex !== null && (
-              <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-                <h4 className="text-white font-bold text-xs uppercase mb-3">Assign Path {selectedPathIndex}</h4>
-                <div className="space-y-2">
-                  {pathTypes.map(type => (
-                    <button
-                      key={type.value}
-                      onClick={() => assignPath(type.value, type.label)}
-                      className="w-full bg-neutral-800 hover:bg-brand-accent hover:text-black border border-neutral-700 rounded p-2 text-xs font-bold uppercase transition-colors text-left"
-                    >
-                      {type.label}
-                    </button>
+        {step === 'assign' && mode === 'cut' && (
+          <div className="max-w-6xl mx-auto py-12">
+            <h3 className="text-xl font-bold text-white mb-6 text-center uppercase">Assign Paths</h3>
+            <p className="text-neutral-400 text-center mb-8">
+              Move paths between Shape and Trim categories
+            </p>
+
+            {selectedGarments.has('jersey') && pathAssignments.jersey && (
+              <div className="mb-8 bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+                <h4 className="text-brand-accent font-bold uppercase mb-4 flex items-center gap-2">
+                  <Shirt size={16} /> Jersey Paths
+                </h4>
+                <div className="grid grid-cols-2 gap-6">
+                  {(['front', 'back'] as const).map(side => (
+                    <div key={side} className="space-y-4">
+                      <h5 className="text-white font-bold uppercase text-sm">{side}</h5>
+                      <div className="bg-black/50 p-4 rounded">
+                        <div className="text-xs text-neutral-400 uppercase mb-2 font-bold">Shape ({pathAssignments.jersey!.shape[side].length})</div>
+                        {pathAssignments.jersey!.shape[side].map((path, i) => (
+                          <div key={i} className="text-xs text-neutral-300 mb-1 flex items-center gap-2 p-1 hover:bg-neutral-800 rounded">
+                            <span className="flex-1 truncate font-mono">{path.substring(0, 30)}...</span>
+                            <button
+                              onClick={() => movePath('jersey', 'shape', 'trim', side, i)}
+                              className="text-brand-accent hover:text-white px-2 py-1 bg-neutral-900 rounded"
+                              title="Move to Trim"
+                            >
+                              →
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="bg-black/50 p-4 rounded">
+                        <div className="text-xs text-neutral-400 uppercase mb-2 font-bold">Trim ({pathAssignments.jersey!.trim[side].length})</div>
+                        {pathAssignments.jersey!.trim[side].map((path, i) => (
+                          <div key={i} className="text-xs text-neutral-300 mb-1 flex items-center gap-2 p-1 hover:bg-neutral-800 rounded">
+                            <button
+                              onClick={() => movePath('jersey', 'trim', 'shape', side, i)}
+                              className="text-brand-accent hover:text-white px-2 py-1 bg-neutral-900 rounded"
+                              title="Move to Shape"
+                            >
+                              ←
+                            </button>
+                            <span className="flex-1 truncate font-mono">{path.substring(0, 30)}...</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-              <h4 className="text-white font-bold text-xs uppercase mb-3">Assigned Paths</h4>
-              <div className="space-y-2">
-                {Object.entries(activeAssignments).map(([index, assignment]) => (
-                  <div key={index} className="flex justify-between items-center bg-black/50 p-2 rounded text-xs">
-                    <span className="text-neutral-400">Path {index}: <span className="text-white">{assignment.label}</span></span>
-                    <button
-                      onClick={() => removePath(activeSide, Number(index))}
-                      className="text-red-500 hover:text-red-400"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                {Object.keys(activeAssignments).length === 0 && (
-                  <p className="text-neutral-600 text-xs">No paths assigned yet</p>
-                )}
-              </div>
-            </div>
-
-            <button
-              onClick={() => setStep('review')}
-              disabled={Object.keys(pathAssignments.front).length === 0 || Object.keys(pathAssignments.back).length === 0}
-              className="w-full bg-brand-accent disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold uppercase text-sm px-4 py-3 rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2"
-            >
-              Review & Save <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 'review') {
-    return (
-      <div className="h-full flex flex-col">
-        <div className="mb-6">
-          <button
-            onClick={() => setStep('assign')}
-            className="text-neutral-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest flex items-center gap-2"
-          >
-            <ArrowLeft size={14} /> Back
-          </button>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center">
-          <div className="max-w-2xl w-full space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-white text-2xl font-bold uppercase mb-2">Final Details</h2>
-              <p className="text-neutral-400 text-sm">Review and save your {mode}</p>
-            </div>
-
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 space-y-4">
-              <div>
-                <label className="text-xs text-neutral-500 uppercase font-bold block mb-2">Sport</label>
-                <p className="text-white font-bold">{selectedSport?.label}</p>
-              </div>
-
-              {mode === 'template' && (
-                <div>
-                  <label className="text-xs text-neutral-500 uppercase font-bold block mb-2">Base Cut</label>
-                  <p className="text-white font-bold">{selectedCut?.label}</p>
+            {selectedGarments.has('shorts') && pathAssignments.shorts && (
+              <div className="mb-8 bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+                <h4 className="text-green-500 font-bold uppercase mb-4 flex items-center gap-2">
+                  <Scissors size={16} /> Shorts Paths
+                </h4>
+                <div className="grid grid-cols-2 gap-6">
+                  {(['front', 'back'] as const).map(side => (
+                    <div key={side} className="space-y-4">
+                      <h5 className="text-white font-bold uppercase text-sm">{side}</h5>
+                      <div className="bg-black/50 p-4 rounded">
+                        <div className="text-xs text-neutral-400 uppercase mb-2 font-bold">Shape ({pathAssignments.shorts!.shape[side].length})</div>
+                        {pathAssignments.shorts!.shape[side].map((path, i) => (
+                          <div key={i} className="text-xs text-neutral-300 mb-1 flex items-center gap-2 p-1 hover:bg-neutral-800 rounded">
+                            <span className="flex-1 truncate font-mono">{path.substring(0, 30)}...</span>
+                            <button
+                              onClick={() => movePath('shorts', 'shape', 'trim', side, i)}
+                              className="text-green-500 hover:text-white px-2 py-1 bg-neutral-900 rounded"
+                              title="Move to Trim"
+                            >
+                              →
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="bg-black/50 p-4 rounded">
+                        <div className="text-xs text-neutral-400 uppercase mb-2 font-bold">Trim ({pathAssignments.shorts!.trim[side].length})</div>
+                        {pathAssignments.shorts!.trim[side].map((path, i) => (
+                          <div key={i} className="text-xs text-neutral-300 mb-1 flex items-center gap-2 p-1 hover:bg-neutral-800 rounded">
+                            <button
+                              onClick={() => movePath('shorts', 'trim', 'shape', side, i)}
+                              className="text-green-500 hover:text-white px-2 py-1 bg-neutral-900 rounded"
+                              title="Move to Shape"
+                            >
+                              ←
+                            </button>
+                            <span className="flex-1 truncate font-mono">{path.substring(0, 30)}...</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-
-              <div>
-                <label className="text-xs text-neutral-500 uppercase font-bold block mb-2">Slug (URL-friendly ID)</label>
-                <input
-                  type="text"
-                  value={itemSlug}
-                  onChange={e => setItemSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-                  className="w-full bg-black border border-neutral-700 rounded p-2 text-white focus:border-brand-accent outline-none"
-                  placeholder="e.g. mens-pro-fit"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-neutral-500 uppercase font-bold block mb-2">Display Label</label>
-                <input
-                  type="text"
-                  value={itemLabel}
-                  onChange={e => setItemLabel(e.target.value)}
-                  className="w-full bg-black border border-neutral-700 rounded p-2 text-white focus:border-brand-accent outline-none"
-                  placeholder="e.g. Men's Pro Fit"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-neutral-500 uppercase font-bold block mb-2">Summary</label>
-                <div className="bg-black/50 p-3 rounded text-xs space-y-1">
-                  <p className="text-neutral-400">Front paths: <span className="text-white">{Object.keys(pathAssignments.front).length}</span></p>
-                  <p className="text-neutral-400">Back paths: <span className="text-white">{Object.keys(pathAssignments.back).length}</span></p>
-                  {mode === 'template' && (
-                    <p className="text-neutral-400">
-                      Layers: <span className="text-white">
-                        {new Set([
-                          ...Object.values(pathAssignments.front).map(a => a.type),
-                          ...Object.values(pathAssignments.back).map(a => a.type)
-                        ]).size}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {saveError && (
-              <div className="bg-red-500/10 border border-red-500 rounded-lg p-4 text-red-500 text-sm">
-                {saveError}
               </div>
             )}
 
-            <button
-              onClick={mode === 'cut' ? saveCut : saveTemplate}
-              disabled={saving || !itemSlug || !itemLabel}
-              className="w-full bg-brand-accent disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold uppercase text-sm px-6 py-4 rounded-lg hover:bg-white transition-colors flex items-center justify-center gap-2"
-            >
-              {saving ? (
-                <>Saving...</>
-              ) : (
-                <>
-                  <Save size={16} /> Save {mode === 'cut' ? 'Cut' : 'Template'}
-                </>
-              )}
-            </button>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setStep('review')}
+                className="px-8 py-3 bg-brand-accent text-black font-bold uppercase rounded-lg hover:bg-brand-accent/90 transition-colors"
+              >
+                Continue to Review
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
-    );
-  }
+        )}
 
-  return null;
+        {step === 'review' && (
+          <div className="max-w-4xl mx-auto py-12">
+            <h3 className="text-xl font-bold text-white mb-6 text-center uppercase">Review & Save</h3>
+
+            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 mb-6">
+              <h4 className="text-white font-bold uppercase mb-4">Basic Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-2">
+                    {mode === 'cut' ? 'Cut' : 'Template'} Slug
+                  </label>
+                  <input
+                    type="text"
+                    value={mode === 'cut' ? cutSlug : templateSlug}
+                    onChange={(e) => mode === 'cut' ? setCutSlug(e.target.value) : setTemplateSlug(e.target.value)}
+                    className="w-full px-4 py-2 bg-black border border-neutral-800 rounded text-white focus:border-brand-accent outline-none"
+                    placeholder="e.g., mens-elite"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-2">
+                    {mode === 'cut' ? 'Cut' : 'Template'} Label
+                  </label>
+                  <input
+                    type="text"
+                    value={mode === 'cut' ? cutLabel : templateLabel}
+                    onChange={(e) => mode === 'cut' ? setCutLabel(e.target.value) : setTemplateLabel(e.target.value)}
+                    className="w-full px-4 py-2 bg-black border border-neutral-800 rounded text-white focus:border-brand-accent outline-none"
+                    placeholder="e.g., Men's Elite"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {mode === 'cut' && (
+              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 mb-6">
+                <h4 className="text-white font-bold uppercase mb-4">Path Summary</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedGarments.has('jersey') && pathAssignments.jersey && (
+                    <div>
+                      <h5 className="text-brand-accent font-bold mb-2 flex items-center gap-2">
+                        <Shirt size={14} /> Jersey
+                      </h5>
+                      <div className="text-sm text-neutral-300 space-y-1">
+                        <div>Shape Front: {pathAssignments.jersey.shape.front.length} paths</div>
+                        <div>Shape Back: {pathAssignments.jersey.shape.back.length} paths</div>
+                        <div>Trim Front: {pathAssignments.jersey.trim.front.length} paths</div>
+                        <div>Trim Back: {pathAssignments.jersey.trim.back.length} paths</div>
+                      </div>
+                    </div>
+                  )}
+                  {selectedGarments.has('shorts') && pathAssignments.shorts && (
+                    <div>
+                      <h5 className="text-green-500 font-bold mb-2 flex items-center gap-2">
+                        <Scissors size={14} /> Shorts
+                      </h5>
+                      <div className="text-sm text-neutral-300 space-y-1">
+                        <div>Shape Front: {pathAssignments.shorts.shape.front.length} paths</div>
+                        <div>Shape Back: {pathAssignments.shorts.shape.back.length} paths</div>
+                        <div>Trim Front: {pathAssignments.shorts.trim.front.length} paths</div>
+                        <div>Trim Back: {pathAssignments.shorts.trim.back.length} paths</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {mode === 'template' && (
+              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-white font-bold uppercase">Template Layers</h4>
+                  <button
+                    onClick={addLayer}
+                    className="px-4 py-2 bg-brand-accent text-black font-bold uppercase text-xs rounded hover:bg-brand-accent/90"
+                  >
+                    Add Layer
+                  </button>
+                </div>
+                {layers.length === 0 ? (
+                  <p className="text-neutral-500 text-sm text-center py-8">No layers added yet. Click "Add Layer" to create one.</p>
+                ) : (
+                  layers.map((layer, index) => (
+                    <div key={layer.id} className="bg-black/50 p-4 rounded mb-4">
+                      <div className="flex items-center gap-4 mb-2">
+                        <input
+                          type="text"
+                          value={layer.label}
+                          onChange={(e) => updateLayerLabel(index, e.target.value)}
+                          className="flex-1 px-3 py-2 bg-neutral-900 border border-neutral-800 rounded text-white text-sm focus:border-brand-accent outline-none"
+                          placeholder="Layer name"
+                        />
+                        <button
+                          onClick={() => removeLayer(index)}
+                          className="text-red-500 hover:text-red-400 p-2"
+                          title="Remove layer"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <div className="text-xs text-neutral-400 flex gap-4">
+                        <span>Jersey: {layer.paths.jersey.front.length + layer.paths.jersey.back.length} paths</span>
+                        <span>Shorts: {layer.paths.shorts.front.length + layer.paths.shorts.back.length} paths</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-center">
+              <button
+                onClick={mode === 'cut' ? handleSaveCut : handleSaveTemplate}
+                disabled={saving}
+                className="px-8 py-3 bg-brand-accent text-black font-bold uppercase rounded-lg hover:bg-brand-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    {isEditMode ? 'Update' : 'Create'} {mode === 'cut' ? 'Cut' : 'Template'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };

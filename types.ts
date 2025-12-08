@@ -82,6 +82,7 @@ export interface ColorOption {
 //    These paths rarely change for a given sport/gender.
 //    Now supports both jersey and shorts for each cut.
 export interface ProductCut {
+  dbId?: string;
   jersey: {
     shape: { front: string; back: string };
     trim: { front: string; back: string };
@@ -95,6 +96,7 @@ export interface ProductCut {
 // 2. A "Layer" is a single editable zone within a design template (e.g., "Side Panel", "Chevron")
 export interface DesignLayer {
   id: string;
+  dbId?: string;
   label: string;
   paths: {
     jersey: { front: string; back: string };
@@ -106,6 +108,7 @@ export interface DesignLayer {
 //    It sits on top of the Product Cut.
 export interface DesignTemplate {
   id: string;
+  dbId?: string;
   label: string;
   layers: DesignLayer[];
 }
