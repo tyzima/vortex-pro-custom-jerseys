@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { DesignState, ViewSide, ZoneStyle } from '../types';
-import { SPORTS_LIBRARY } from '../data/templates/index';
+import { useTemplateLibrary } from '../contexts/TemplateLibraryContext';
 
 interface JerseySVGProps {
   design: DesignState;
@@ -12,6 +12,7 @@ interface JerseySVGProps {
 
 export const JerseySVG: React.FC<JerseySVGProps> = ({ design, view, onPositionChange, onSelect, id: componentId = 'main' }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const { library: SPORTS_LIBRARY } = useTemplateLibrary();
 
   // Local drag state now includes the current position to avoid parent re-renders
   const [dragState, setDragState] = useState<{
@@ -19,6 +20,11 @@ export const JerseySVG: React.FC<JerseySVGProps> = ({ design, view, onPositionCh
     offset: { x: number, y: number },
     currentPos: { x: number, y: number }
   } | null>(null);
+
+  // Handle library loading
+  if (!SPORTS_LIBRARY) {
+    return <svg viewBox="0 0 400 500" className="w-full h-full" />;
+  }
 
   // 1. Resolve Sport, Cut, and Template from Registry
   const sportDef = SPORTS_LIBRARY[design.sport] || SPORTS_LIBRARY.basketball;

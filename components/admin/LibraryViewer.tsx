@@ -1,13 +1,35 @@
 
 import React from 'react';
-import { SPORTS_LIBRARY } from '../../data/templates/index';
-import { Shirt, Layout, PenLine } from 'lucide-react';
+import { useTemplateLibrary } from '../../contexts/TemplateLibraryContext';
+import { Shirt, Layout, PenLine, RefreshCw } from 'lucide-react';
 
 interface LibraryViewerProps {
     onEdit: (frontSvg: string, backSvg: string) => void;
 }
 
 export const LibraryViewer: React.FC<LibraryViewerProps> = ({ onEdit }) => {
+    const { library: SPORTS_LIBRARY, loading, error, refresh } = useTemplateLibrary();
+
+    if (loading || !SPORTS_LIBRARY) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <div className="text-brand-accent text-xl font-bold uppercase tracking-widest animate-pulse">
+                    Loading Library...
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <div className="text-red-500 text-xl font-bold uppercase tracking-widest">
+                    Error: {error}
+                </div>
+            </div>
+        );
+    }
+
     const sports = Object.values(SPORTS_LIBRARY);
 
     // Helpers to reconstruct SVG strings for editing
@@ -38,7 +60,17 @@ export const LibraryViewer: React.FC<LibraryViewerProps> = ({ onEdit }) => {
     };
 
     return (
-        <div className="grid grid-cols-1 gap-8 pb-12">
+        <div className="pb-12">
+            <div className="mb-6 flex justify-end">
+                <button
+                    onClick={() => refresh()}
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-accent text-brand-black font-bold uppercase text-xs tracking-wider rounded-lg hover:bg-brand-accent/90 transition-colors"
+                >
+                    <RefreshCw className="w-4 h-4" />
+                    Refresh Library
+                </button>
+            </div>
+            <div className="grid grid-cols-1 gap-8">
             {sports.map(sport => (
                 <div key={sport.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
                     <div className="flex items-center justify-between mb-6 border-b border-neutral-800 pb-4">
@@ -109,6 +141,7 @@ export const LibraryViewer: React.FC<LibraryViewerProps> = ({ onEdit }) => {
                     </div>
                 </div>
             ))}
+            </div>
         </div>
     );
 };

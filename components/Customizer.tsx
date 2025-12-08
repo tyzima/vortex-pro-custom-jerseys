@@ -1,13 +1,13 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { DesignState, ViewSide, PatternType, COLORS, FONTS, Sport, Cut, TemplateId, ZoneStyle, CartItem } from '../types';
-import { SPORTS_LIBRARY } from '../data/templates/index';
 import { JerseySVG } from './JerseySVG';
 import { Type, Upload, ChevronRight, ChevronLeft, Shirt, Layout, PaintBucket, ChevronDown, ChevronUp, Droplets, Ghost, History, Sun, Moon, ShoppingBag, Plus, X, Check, Link, Unlink, Dices, Trash2, Users } from 'lucide-react';
 import { FaBasketballBall, FaFutbol, FaRunning } from 'react-icons/fa';
 import { LacrosseIcon } from './icons/SportsIcons';
 import { Tooltip } from './ui/Tooltip';
 import { useTheme } from './ThemeContext';
+import { useTemplateLibrary } from '../contexts/TemplateLibraryContext';
 
 // Initial Default State
 const DEFAULT_ZONES: Record<string, ZoneStyle> = {
@@ -88,6 +88,7 @@ const Thumbnail = React.memo(({ id, sport, cut, template, colors, garmentType }:
 
 export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCartItem, editingItemId, editingItem, onCheckout }) => {
     const { theme, toggleTheme } = useTheme();
+    const { library: SPORTS_LIBRARY, loading: libraryLoading, error: libraryError } = useTemplateLibrary();
     const [view, setView] = useState<ViewSide>('front');
     const [currentStep, setCurrentStep] = useState(1);
     const [activeIdentitySection, setActiveIdentitySection] = useState<'style' | 'team' | 'player'>('team');
@@ -302,6 +303,27 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
             }));
         }
     };
+
+    // Handle library loading states
+    if (libraryLoading || !SPORTS_LIBRARY) {
+        return (
+            <div className="fixed inset-0 bg-brand-black flex items-center justify-center">
+                <div className="text-brand-accent text-xl font-bold uppercase tracking-widest animate-pulse">
+                    Loading Templates...
+                </div>
+            </div>
+        );
+    }
+
+    if (libraryError) {
+        return (
+            <div className="fixed inset-0 bg-brand-black flex items-center justify-center">
+                <div className="text-red-500 text-xl font-bold uppercase tracking-widest">
+                    Error: {libraryError}
+                </div>
+            </div>
+        );
+    }
 
     // Dynamic Data Retrieval
     const availableSports = Object.values(SPORTS_LIBRARY);

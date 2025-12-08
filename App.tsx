@@ -20,6 +20,7 @@ import { CartItem } from './types';
 import { ArrowLeft } from 'lucide-react';
 import { ThemeProvider } from './components/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { TemplateLibraryProvider } from './contexts/TemplateLibraryContext';
 
 const AppContent = () => {
   const { user, profile, loading } = useAuth();
@@ -246,7 +247,9 @@ const App = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
+        <TemplateLibraryProvider>
+          <AppContent />
+        </TemplateLibraryProvider>
       </AuthProvider>
     </ThemeProvider>
   );
