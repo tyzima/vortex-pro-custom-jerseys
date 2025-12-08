@@ -12,18 +12,12 @@ import { supabase } from '../../lib/supabase';
 interface NavItem {
   sportId: string;
   sportLabel: string;
-  cutId: string;
-  cutLabel: string;
-  garmentType: 'jersey' | 'shorts';
 }
 
 interface Sport {
   id: string;
   label: string;
-  cuts: Array<{
-    id: string;
-    label: string;
-  }>;
+  templateCount?: number;
 }
 
 interface Template {
@@ -46,7 +40,7 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    loadSportsAndCuts();
+    loadSports();
   }, []);
 
   useEffect(() => {
@@ -55,7 +49,7 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
     }
   }, [selectedNav]);
 
-  const loadSportsAndCuts = async () => {
+  const loadSports = async () => {
     try {
       setLoading(true);
       const { data: sportsData, error: sportsError } = await supabase
@@ -66,23 +60,22 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
 
       if (sportsError) throw sportsError;
 
-      const sportsWithCuts = await Promise.all(
+      const sportsWithTemplateCount = await Promise.all(
         (sportsData || []).map(async (sport) => {
-          const { data: cutsData } = await supabase
-            .from('product_cuts')
-            .select('id, label, display_order')
-            .eq('sport_id', sport.id)
-            .order('display_order');
+          const { count } = await supabase
+            .from('sport_templates')
+            .select('*', { count: 'exact', head: true })
+            .eq('sport_id', sport.id);
 
           return {
             id: sport.id,
             label: sport.label,
-            cuts: cutsData || []
+            templateCount: count || 0
           };
         })
       );
 
-      setSports(sportsWithCuts);
+      setSports(sportsWithTemplateCount);
     } catch (error) {
       console.error('Error loading sports:', error);
     } finally {
@@ -263,8 +256,6 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
               {selectedNav ? (
                 <TemplateGrid
                   sportLabel={selectedNav.sportLabel}
-                  cutLabel={selectedNav.cutLabel}
-                  garmentType={selectedNav.garmentType}
                   templates={templates}
                   onEditTemplate={handleEditTemplate}
                   onCreateTemplate={handleCreateTemplate}
@@ -273,8 +264,8 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
                 <div className="flex-1 flex items-center justify-center text-neutral-500">
                   <div className="text-center">
                     <Palette className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium">Select a garment to view templates</p>
-                    <p className="text-sm mt-2">Choose a sport, cut, and garment from the left sidebar</p>
+                    <p className="text-lg font-medium">Select a sport to view templates</p>
+                    <p className="text-sm mt-2">Choose a sport from the left sidebar</p>
                   </div>
                 </div>
               )}

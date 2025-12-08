@@ -7,6 +7,9 @@ interface TemplateLibraryContextType {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  getSportById: (sportId: string) => SportDefinition | null;
+  getTemplateById: (sportId: string, templateId: string) => import('../types').DesignTemplate | null;
+  getCutById: (sportId: string, cutId: string) => import('../types').ProductCut | null;
 }
 
 const TemplateLibraryContext = createContext<TemplateLibraryContextType | undefined>(undefined);
@@ -87,12 +90,37 @@ export function TemplateLibraryProvider({ children }: { children: React.ReactNod
     await loadLibrary(false);
   }, [loadLibrary]);
 
+  const getSportById = useCallback((sportId: string): SportDefinition | null => {
+    if (!library) return null;
+    return library[sportId] || null;
+  }, [library]);
+
+  const getTemplateById = useCallback((sportId: string, templateId: string) => {
+    const sport = getSportById(sportId);
+    if (!sport) return null;
+    return sport.templates.find(t => t.id === templateId || t.dbId === templateId) || null;
+  }, [getSportById]);
+
+  const getCutById = useCallback((sportId: string, cutId: string) => {
+    const sport = getSportById(sportId);
+    if (!sport || !sport.cuts) return null;
+    return sport.cuts[cutId] || null;
+  }, [getSportById]);
+
   useEffect(() => {
     loadLibrary(true);
   }, [loadLibrary]);
 
   return (
-    <TemplateLibraryContext.Provider value={{ library, loading, error, refresh }}>
+    <TemplateLibraryContext.Provider value={{
+      library,
+      loading,
+      error,
+      refresh,
+      getSportById,
+      getTemplateById,
+      getCutById
+    }}>
       {children}
     </TemplateLibraryContext.Provider>
   );
