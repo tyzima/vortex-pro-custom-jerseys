@@ -22,9 +22,12 @@ import {
   AlertCircle,
   Loader2,
   FileUp,
-  Edit3
+  Edit3,
+  HelpCircle,
+  Info
 } from 'lucide-react';
 import type { ProductCut, DesignTemplate, DesignLayer, SportDefinition } from '../../types';
+import { Tooltip } from '../ui/Tooltip';
 import { useTemplateLibrary } from '../../contexts/TemplateLibraryContext';
 import {
   createTemplate,
@@ -974,7 +977,12 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                             </div>
 
                             <div>
-                              <label className="text-[10px] text-neutral-500 uppercase mb-2 block">Upload SVG Paths</label>
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <label className="text-[10px] text-neutral-500 uppercase">Upload SVG Paths</label>
+                                <Tooltip content="SVG viewbox: 400x500" position="right">
+                                  <HelpCircle size={12} className="text-neutral-600 hover:text-neutral-400 cursor-help" />
+                                </Tooltip>
+                              </div>
                               <div className="grid grid-cols-2 gap-2">
                                 <button
                                   onClick={(e) => { e.stopPropagation(); openUploadModal(layer.id, 'front'); }}
@@ -1246,9 +1254,20 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
               </button>
             </div>
 
-            <p className="text-xs text-neutral-600 mt-4 text-center">
-              Upload an SVG file containing path elements. All paths will be extracted and added to this layer.
-            </p>
+            <div className="mt-4 p-3 bg-neutral-800/50 border border-neutral-700 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Info size={16} className="text-brand-accent mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-neutral-400">
+                  <p className="font-semibold text-neutral-300 mb-1">SVG Requirements</p>
+                  <ul className="space-y-1 list-disc list-inside text-neutral-500">
+                    <li>Viewbox: <span className="text-neutral-300 font-mono">0 0 400 500</span> (400x500)</li>
+                    <li>Use only <span className="text-neutral-300 font-mono">&lt;path&gt;</span> elements</li>
+                    <li>Paths should be filled, not stroked</li>
+                    <li>Export from Illustrator/Figma at this exact size</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
