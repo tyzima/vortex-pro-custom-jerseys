@@ -730,50 +730,96 @@ export const TemplateBuilder: React.FC<TemplateBuilderProps> = ({ editContext, o
         )}
 
         {step === 'assign' && mode === 'cut' && (
-          <div className="max-w-6xl mx-auto py-12">
-            <h3 className="text-xl font-bold text-white mb-6 text-center uppercase">Assign Paths</h3>
+          <div className="max-w-7xl mx-auto py-12">
+            <h3 className="text-xl font-bold text-white mb-6 text-center uppercase">Assign Paths Visually</h3>
             <p className="text-neutral-400 text-center mb-8">
-              Move paths between Shape and Trim categories
+              Move paths between Shape (dark gray) and Trim (highlighted color)
             </p>
 
             {selectedGarments.has('jersey') && pathAssignments.jersey && (
-              <div className="mb-8 bg-neutral-900 border border-neutral-800 rounded-lg p-6">
-                <h4 className="text-brand-accent font-bold uppercase mb-4 flex items-center gap-2">
-                  <Shirt size={16} /> Jersey Paths
+              <div className="mb-12">
+                <h4 className="text-brand-accent font-bold uppercase mb-6 flex items-center gap-2 text-lg">
+                  <Shirt size={20} /> Jersey Paths
                 </h4>
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-8">
                   {(['front', 'back'] as const).map(side => (
-                    <div key={side} className="space-y-4">
-                      <h5 className="text-white font-bold uppercase text-sm">{side}</h5>
-                      <div className="bg-black/50 p-4 rounded">
-                        <div className="text-xs text-neutral-400 uppercase mb-2 font-bold">Shape ({pathAssignments.jersey!.shape[side].length})</div>
-                        {pathAssignments.jersey!.shape[side].map((path, i) => (
-                          <div key={i} className="text-xs text-neutral-300 mb-1 flex items-center gap-2 p-1 hover:bg-neutral-800 rounded">
-                            <span className="flex-1 truncate font-mono">{path.substring(0, 30)}...</span>
-                            <button
-                              onClick={() => movePath('jersey', 'shape', 'trim', side, i)}
-                              className="text-brand-accent hover:text-white px-2 py-1 bg-neutral-900 rounded"
-                              title="Move to Trim"
-                            >
-                              →
-                            </button>
-                          </div>
-                        ))}
+                    <div key={side} className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                      <div className="p-4 bg-neutral-900/50 border-b border-neutral-800">
+                        <h5 className="text-white font-bold uppercase">{side} View</h5>
                       </div>
-                      <div className="bg-black/50 p-4 rounded">
-                        <div className="text-xs text-neutral-400 uppercase mb-2 font-bold">Trim ({pathAssignments.jersey!.trim[side].length})</div>
-                        {pathAssignments.jersey!.trim[side].map((path, i) => (
-                          <div key={i} className="text-xs text-neutral-300 mb-1 flex items-center gap-2 p-1 hover:bg-neutral-800 rounded">
-                            <button
-                              onClick={() => movePath('jersey', 'trim', 'shape', side, i)}
-                              className="text-brand-accent hover:text-white px-2 py-1 bg-neutral-900 rounded"
-                              title="Move to Shape"
-                            >
-                              ←
-                            </button>
-                            <span className="flex-1 truncate font-mono">{path.substring(0, 30)}...</span>
+
+                      {/* VISUAL PREVIEW */}
+                      <div className="p-8 bg-gradient-to-br from-black to-neutral-900 flex items-center justify-center">
+                        <svg viewBox="0 0 400 500" className="w-full max-w-sm h-auto drop-shadow-2xl">
+                          {pathAssignments.jersey.shape[side].map((path, i) => (
+                            <path
+                              key={`shape-${i}`}
+                              d={path}
+                              fill="#2a2a2a"
+                              stroke="#444"
+                              strokeWidth="2"
+                            />
+                          ))}
+                          {pathAssignments.jersey.trim[side].map((path, i) => (
+                            <path
+                              key={`trim-${i}`}
+                              d={path}
+                              fill="#D2F802"
+                              stroke="#fff"
+                              strokeWidth="1"
+                              opacity="0.9"
+                            />
+                          ))}
+                        </svg>
+                      </div>
+
+                      {/* PATH CONTROLS */}
+                      <div className="p-6 space-y-4">
+                        <div className="bg-black/50 p-4 rounded-lg">
+                          <div className="text-xs text-neutral-400 uppercase mb-3 font-bold flex items-center justify-between">
+                            <span>Shape Paths ({pathAssignments.jersey.shape[side].length})</span>
+                            <span className="text-[10px] text-neutral-600">Dark Gray</span>
                           </div>
-                        ))}
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {pathAssignments.jersey.shape[side].map((path, i) => (
+                              <div key={i} className="flex items-center gap-2 text-xs">
+                                <span className="flex-1 truncate font-mono text-neutral-500">Path {i + 1}</span>
+                                <button
+                                  onClick={() => movePath('jersey', 'shape', 'trim', side, i)}
+                                  className="text-brand-accent hover:bg-brand-accent hover:text-black px-2 py-1 rounded text-[10px] font-bold transition-colors"
+                                >
+                                  → Trim
+                                </button>
+                              </div>
+                            ))}
+                            {pathAssignments.jersey.shape[side].length === 0 && (
+                              <div className="text-xs text-neutral-600 text-center py-2">No shape paths</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-black/50 p-4 rounded-lg">
+                          <div className="text-xs text-neutral-400 uppercase mb-3 font-bold flex items-center justify-between">
+                            <span>Trim Paths ({pathAssignments.jersey.trim[side].length})</span>
+                            <span className="text-[10px] text-brand-accent">Highlighted</span>
+                          </div>
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {pathAssignments.jersey.trim[side].map((path, i) => (
+                              <div key={i} className="flex items-center gap-2 text-xs">
+                                <button
+                                  onClick={() => movePath('jersey', 'trim', 'shape', side, i)}
+                                  className="text-brand-accent hover:bg-brand-accent hover:text-black px-2 py-1 rounded text-[10px] font-bold transition-colors"
+                                >
+                                  ← Shape
+                                </button>
+                                <span className="flex-1 truncate font-mono text-neutral-500">Path {i + 1}</span>
+                              </div>
+                            ))}
+                            {pathAssignments.jersey.trim[side].length === 0 && (
+                              <div className="text-xs text-neutral-600 text-center py-2">No trim paths</div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -782,43 +828,89 @@ export const TemplateBuilder: React.FC<TemplateBuilderProps> = ({ editContext, o
             )}
 
             {selectedGarments.has('shorts') && pathAssignments.shorts && (
-              <div className="mb-8 bg-neutral-900 border border-neutral-800 rounded-lg p-6">
-                <h4 className="text-green-500 font-bold uppercase mb-4 flex items-center gap-2">
-                  <Scissors size={16} /> Shorts Paths
+              <div className="mb-12">
+                <h4 className="text-green-500 font-bold uppercase mb-6 flex items-center gap-2 text-lg">
+                  <Scissors size={20} /> Shorts Paths
                 </h4>
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-8">
                   {(['front', 'back'] as const).map(side => (
-                    <div key={side} className="space-y-4">
-                      <h5 className="text-white font-bold uppercase text-sm">{side}</h5>
-                      <div className="bg-black/50 p-4 rounded">
-                        <div className="text-xs text-neutral-400 uppercase mb-2 font-bold">Shape ({pathAssignments.shorts!.shape[side].length})</div>
-                        {pathAssignments.shorts!.shape[side].map((path, i) => (
-                          <div key={i} className="text-xs text-neutral-300 mb-1 flex items-center gap-2 p-1 hover:bg-neutral-800 rounded">
-                            <span className="flex-1 truncate font-mono">{path.substring(0, 30)}...</span>
-                            <button
-                              onClick={() => movePath('shorts', 'shape', 'trim', side, i)}
-                              className="text-green-500 hover:text-white px-2 py-1 bg-neutral-900 rounded"
-                              title="Move to Trim"
-                            >
-                              →
-                            </button>
-                          </div>
-                        ))}
+                    <div key={side} className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                      <div className="p-4 bg-neutral-900/50 border-b border-neutral-800">
+                        <h5 className="text-white font-bold uppercase">{side} View</h5>
                       </div>
-                      <div className="bg-black/50 p-4 rounded">
-                        <div className="text-xs text-neutral-400 uppercase mb-2 font-bold">Trim ({pathAssignments.shorts!.trim[side].length})</div>
-                        {pathAssignments.shorts!.trim[side].map((path, i) => (
-                          <div key={i} className="text-xs text-neutral-300 mb-1 flex items-center gap-2 p-1 hover:bg-neutral-800 rounded">
-                            <button
-                              onClick={() => movePath('shorts', 'trim', 'shape', side, i)}
-                              className="text-green-500 hover:text-white px-2 py-1 bg-neutral-900 rounded"
-                              title="Move to Shape"
-                            >
-                              ←
-                            </button>
-                            <span className="flex-1 truncate font-mono">{path.substring(0, 30)}...</span>
+
+                      {/* VISUAL PREVIEW */}
+                      <div className="p-8 bg-gradient-to-br from-black to-neutral-900 flex items-center justify-center">
+                        <svg viewBox="0 0 400 500" className="w-full max-w-sm h-auto drop-shadow-2xl">
+                          {pathAssignments.shorts.shape[side].map((path, i) => (
+                            <path
+                              key={`shape-${i}`}
+                              d={path}
+                              fill="#2a2a2a"
+                              stroke="#444"
+                              strokeWidth="2"
+                            />
+                          ))}
+                          {pathAssignments.shorts.trim[side].map((path, i) => (
+                            <path
+                              key={`trim-${i}`}
+                              d={path}
+                              fill="#22c55e"
+                              stroke="#fff"
+                              strokeWidth="1"
+                              opacity="0.9"
+                            />
+                          ))}
+                        </svg>
+                      </div>
+
+                      {/* PATH CONTROLS */}
+                      <div className="p-6 space-y-4">
+                        <div className="bg-black/50 p-4 rounded-lg">
+                          <div className="text-xs text-neutral-400 uppercase mb-3 font-bold flex items-center justify-between">
+                            <span>Shape Paths ({pathAssignments.shorts.shape[side].length})</span>
+                            <span className="text-[10px] text-neutral-600">Dark Gray</span>
                           </div>
-                        ))}
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {pathAssignments.shorts.shape[side].map((path, i) => (
+                              <div key={i} className="flex items-center gap-2 text-xs">
+                                <span className="flex-1 truncate font-mono text-neutral-500">Path {i + 1}</span>
+                                <button
+                                  onClick={() => movePath('shorts', 'shape', 'trim', side, i)}
+                                  className="text-green-500 hover:bg-green-500 hover:text-black px-2 py-1 rounded text-[10px] font-bold transition-colors"
+                                >
+                                  → Trim
+                                </button>
+                              </div>
+                            ))}
+                            {pathAssignments.shorts.shape[side].length === 0 && (
+                              <div className="text-xs text-neutral-600 text-center py-2">No shape paths</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-black/50 p-4 rounded-lg">
+                          <div className="text-xs text-neutral-400 uppercase mb-3 font-bold flex items-center justify-between">
+                            <span>Trim Paths ({pathAssignments.shorts.trim[side].length})</span>
+                            <span className="text-[10px] text-green-500">Highlighted</span>
+                          </div>
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {pathAssignments.shorts.trim[side].map((path, i) => (
+                              <div key={i} className="flex items-center gap-2 text-xs">
+                                <button
+                                  onClick={() => movePath('shorts', 'trim', 'shape', side, i)}
+                                  className="text-green-500 hover:bg-green-500 hover:text-black px-2 py-1 rounded text-[10px] font-bold transition-colors"
+                                >
+                                  ← Shape
+                                </button>
+                                <span className="flex-1 truncate font-mono text-neutral-500">Path {i + 1}</span>
+                              </div>
+                            ))}
+                            {pathAssignments.shorts.trim[side].length === 0 && (
+                              <div className="text-xs text-neutral-600 text-center py-2">No trim paths</div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -873,31 +965,87 @@ export const TemplateBuilder: React.FC<TemplateBuilderProps> = ({ editContext, o
 
             {mode === 'cut' && (
               <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 mb-6">
-                <h4 className="text-white font-bold uppercase mb-4">Path Summary</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <h4 className="text-white font-bold uppercase mb-6">Visual Preview</h4>
+                <div className="grid grid-cols-2 gap-8">
                   {selectedGarments.has('jersey') && pathAssignments.jersey && (
-                    <div>
-                      <h5 className="text-brand-accent font-bold mb-2 flex items-center gap-2">
-                        <Shirt size={14} /> Jersey
+                    <div className="space-y-4">
+                      <h5 className="text-brand-accent font-bold flex items-center gap-2">
+                        <Shirt size={16} /> Jersey
                       </h5>
-                      <div className="text-sm text-neutral-300 space-y-1">
-                        <div>Shape Front: {pathAssignments.jersey.shape.front.length} paths</div>
-                        <div>Shape Back: {pathAssignments.jersey.shape.back.length} paths</div>
-                        <div>Trim Front: {pathAssignments.jersey.trim.front.length} paths</div>
-                        <div>Trim Back: {pathAssignments.jersey.trim.back.length} paths</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xs text-neutral-400 mb-2">Front</div>
+                          <div className="aspect-[3/4] bg-gradient-to-br from-black to-neutral-900 rounded-lg flex items-center justify-center p-4 border border-neutral-800">
+                            <svg viewBox="0 0 400 500" className="w-full h-full">
+                              {pathAssignments.jersey.shape.front.map((path, i) => (
+                                <path key={`shape-${i}`} d={path} fill="#2a2a2a" stroke="#444" strokeWidth="2" />
+                              ))}
+                              {pathAssignments.jersey.trim.front.map((path, i) => (
+                                <path key={`trim-${i}`} d={path} fill="#D2F802" stroke="#fff" strokeWidth="1" opacity="0.9" />
+                              ))}
+                            </svg>
+                          </div>
+                          <div className="text-[10px] text-neutral-500 mt-2">
+                            {pathAssignments.jersey.shape.front.length} shape, {pathAssignments.jersey.trim.front.length} trim
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-400 mb-2">Back</div>
+                          <div className="aspect-[3/4] bg-gradient-to-br from-black to-neutral-900 rounded-lg flex items-center justify-center p-4 border border-neutral-800">
+                            <svg viewBox="0 0 400 500" className="w-full h-full">
+                              {pathAssignments.jersey.shape.back.map((path, i) => (
+                                <path key={`shape-${i}`} d={path} fill="#2a2a2a" stroke="#444" strokeWidth="2" />
+                              ))}
+                              {pathAssignments.jersey.trim.back.map((path, i) => (
+                                <path key={`trim-${i}`} d={path} fill="#D2F802" stroke="#fff" strokeWidth="1" opacity="0.9" />
+                              ))}
+                            </svg>
+                          </div>
+                          <div className="text-[10px] text-neutral-500 mt-2">
+                            {pathAssignments.jersey.shape.back.length} shape, {pathAssignments.jersey.trim.back.length} trim
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
                   {selectedGarments.has('shorts') && pathAssignments.shorts && (
-                    <div>
-                      <h5 className="text-green-500 font-bold mb-2 flex items-center gap-2">
-                        <Scissors size={14} /> Shorts
+                    <div className="space-y-4">
+                      <h5 className="text-green-500 font-bold flex items-center gap-2">
+                        <Scissors size={16} /> Shorts
                       </h5>
-                      <div className="text-sm text-neutral-300 space-y-1">
-                        <div>Shape Front: {pathAssignments.shorts.shape.front.length} paths</div>
-                        <div>Shape Back: {pathAssignments.shorts.shape.back.length} paths</div>
-                        <div>Trim Front: {pathAssignments.shorts.trim.front.length} paths</div>
-                        <div>Trim Back: {pathAssignments.shorts.trim.back.length} paths</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xs text-neutral-400 mb-2">Front</div>
+                          <div className="aspect-[3/4] bg-gradient-to-br from-black to-neutral-900 rounded-lg flex items-center justify-center p-4 border border-neutral-800">
+                            <svg viewBox="0 0 400 500" className="w-full h-full">
+                              {pathAssignments.shorts.shape.front.map((path, i) => (
+                                <path key={`shape-${i}`} d={path} fill="#2a2a2a" stroke="#444" strokeWidth="2" />
+                              ))}
+                              {pathAssignments.shorts.trim.front.map((path, i) => (
+                                <path key={`trim-${i}`} d={path} fill="#22c55e" stroke="#fff" strokeWidth="1" opacity="0.9" />
+                              ))}
+                            </svg>
+                          </div>
+                          <div className="text-[10px] text-neutral-500 mt-2">
+                            {pathAssignments.shorts.shape.front.length} shape, {pathAssignments.shorts.trim.front.length} trim
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-neutral-400 mb-2">Back</div>
+                          <div className="aspect-[3/4] bg-gradient-to-br from-black to-neutral-900 rounded-lg flex items-center justify-center p-4 border border-neutral-800">
+                            <svg viewBox="0 0 400 500" className="w-full h-full">
+                              {pathAssignments.shorts.shape.back.map((path, i) => (
+                                <path key={`shape-${i}`} d={path} fill="#2a2a2a" stroke="#444" strokeWidth="2" />
+                              ))}
+                              {pathAssignments.shorts.trim.back.map((path, i) => (
+                                <path key={`trim-${i}`} d={path} fill="#22c55e" stroke="#fff" strokeWidth="1" opacity="0.9" />
+                              ))}
+                            </svg>
+                          </div>
+                          <div className="text-[10px] text-neutral-500 mt-2">
+                            {pathAssignments.shorts.shape.back.length} shape, {pathAssignments.shorts.trim.back.length} trim
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
