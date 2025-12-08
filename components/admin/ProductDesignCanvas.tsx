@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ChevronLeft,
-  ChevronRight,
   Layers,
   Palette,
   Eye,
@@ -14,18 +13,27 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Download,
   Upload,
   Save,
   Settings,
   Shirt,
   Scissors,
-  Copy,
-  MoreHorizontal,
+  X,
   Check,
-  X
+  AlertCircle,
+  Loader2,
+  FileUp,
+  Edit3
 } from 'lucide-react';
 import type { ProductCut, DesignTemplate, DesignLayer, SportDefinition } from '../../types';
+import { useTemplateLibrary } from '../../contexts/TemplateLibraryContext';
+import {
+  createTemplate,
+  createLayer,
+  updateLayer,
+  deleteLayer,
+  updateLayerPath
+} from '../../lib/templateService';
 
 interface ProductDesignCanvasProps {
   sport: SportDefinition;
@@ -42,6 +50,16 @@ interface LayerState {
   color: string;
 }
 
+interface LocalLayer extends DesignLayer {
+  isNew?: boolean;
+  isModified?: boolean;
+}
+
+interface LocalTemplate extends Omit<DesignTemplate, 'layers'> {
+  layers: LocalLayer[];
+  isNew?: boolean;
+}
+
 const PRESET_COLORS = [
   '#D2F802', '#ffffff', '#0a0a0a', '#dc2626', '#2563eb',
   '#22c55e', '#f97316', '#7e22ce', '#fbbf24', '#14b8a6',
@@ -52,32 +70,54 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
   sport,
   garmentType,
   initialCutSlug,
-  onBack,
-  onSave
+  onBack
 }) => {
+  const { refresh } = useTemplateLibrary();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [selectedCutSlug, setSelectedCutSlug] = useState<string>(
     initialCutSlug && sport.cuts[initialCutSlug] ? initialCutSlug : Object.keys(sport.cuts)[0]
+  );
+  const [localTemplates, setLocalTemplates] = useState<LocalTemplate[]>(() =>
+    sport.templates.map(t => ({ ...t, layers: t.layers.map(l => ({ ...l })) }))
   );
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
   const [viewSide, setViewSide] = useState<'front' | 'back' | 'both'>('both');
   const [zoom, setZoom] = useState(100);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [layerStates, setLayerStates] = useState<Record<string, LayerState>>({});
-  const [showLayerPanel, setShowLayerPanel] = useState(true);
-  const [showColorPanel, setShowColorPanel] = useState(true);
+  const [activePanel, setActivePanel] = useState<'layers' | 'colors'>('layers');
   const [previewColors, setPreviewColors] = useState({
     primary: '#D2F802',
     secondary: '#0a0a0a',
     accent: '#ffffff'
   });
   const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadTarget, setUploadTarget] = useState<{ layerId: string; side: 'front' | 'back' } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const [showNewTemplateModal, setShowNewTemplateModal] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
+
+  const [showNewLayerModal, setShowNewLayerModal] = useState(false);
+  const [newLayerName, setNewLayerName] = useState('');
+
+  const [editingLayerName, setEditingLayerName] = useState<string | null>(null);
+  const [editLayerNameValue, setEditLayerNameValue] = useState('');
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   const currentCut = sport.cuts[selectedCutSlug];
-  const templates = sport.templates;
-  const currentTemplate = templates[selectedTemplateIndex] || null;
+  const currentTemplate = localTemplates[selectedTemplateIndex] || null;
   const garment = garmentType === 'jersey' ? currentCut?.jersey : currentCut?.shorts;
 
-  const initializeLayerStates = (template: DesignTemplate) => {
+  const initializeLayerStates = (template: LocalTemplate) => {
     const states: Record<string, LayerState> = {};
     template.layers.forEach((layer, index) => {
       const colorIndex = index % PRESET_COLORS.length;
@@ -91,19 +131,29 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
     return states;
   };
 
-  useMemo(() => {
-    if (currentTemplate && Object.keys(layerStates).length === 0) {
-      setLayerStates(initializeLayerStates(currentTemplate));
+  useEffect(() => {
+    if (currentTemplate) {
+      setLayerStates(prev => {
+        const newStates = { ...prev };
+        currentTemplate.layers.forEach((layer, index) => {
+          if (!newStates[layer.id]) {
+            const colorIndex = index % PRESET_COLORS.length;
+            newStates[layer.id] = {
+              id: layer.id,
+              visible: true,
+              locked: false,
+              color: PRESET_COLORS[colorIndex]
+            };
+          }
+        });
+        return newStates;
+      });
     }
   }, [currentTemplate]);
 
   const handleTemplateChange = (index: number) => {
     setSelectedTemplateIndex(index);
-    const template = templates[index];
-    if (template) {
-      setLayerStates(initializeLayerStates(template));
-      setSelectedLayerId(null);
-    }
+    setSelectedLayerId(null);
   };
 
   const handleLayerColorChange = (layerId: string, color: string) => {
@@ -126,6 +176,250 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
       ...prev,
       [layerId]: { ...prev[layerId], locked: !prev[layerId]?.locked }
     }));
+  };
+
+  const extractPathsFromSVG = (svgContent: string): string[] => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgContent, 'image/svg+xml');
+    const paths = doc.querySelectorAll('path');
+    return Array.from(paths)
+      .map(p => p.getAttribute('d') || '')
+      .filter(d => d.length > 0);
+  };
+
+  const handleCreateTemplate = async () => {
+    if (!newTemplateName.trim()) return;
+
+    setCreatingTemplate(true);
+    try {
+      const slug = newTemplateName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const newTemplate = await createTemplate({
+        sport_id: sport.id,
+        slug,
+        label: newTemplateName.trim(),
+        display_order: localTemplates.length,
+        is_published: true
+      });
+
+      const localNewTemplate: LocalTemplate = {
+        id: slug,
+        dbId: newTemplate.id,
+        label: newTemplateName.trim(),
+        layers: [],
+        isNew: true
+      };
+
+      setLocalTemplates(prev => [...prev, localNewTemplate]);
+      setSelectedTemplateIndex(localTemplates.length);
+      setNewTemplateName('');
+      setShowNewTemplateModal(false);
+      setIsDirty(true);
+
+      await refresh();
+    } catch (error) {
+      console.error('Failed to create template:', error);
+      setSaveError('Failed to create template');
+    } finally {
+      setCreatingTemplate(false);
+    }
+  };
+
+  const handleAddLayer = async () => {
+    if (!newLayerName.trim() || !currentTemplate?.dbId) return;
+
+    try {
+      const layerSlug = `layer-${Date.now()}`;
+      const newLayer = await createLayer(currentTemplate.dbId, {
+        layer_slug: layerSlug,
+        label: newLayerName.trim(),
+        display_order: currentTemplate.layers.length
+      });
+
+      const localNewLayer: LocalLayer = {
+        id: layerSlug,
+        dbId: newLayer.id,
+        label: newLayerName.trim(),
+        paths: {
+          jersey: { front: [], back: [] },
+          shorts: { front: [], back: [] }
+        },
+        isNew: true
+      };
+
+      setLocalTemplates(prev => prev.map((t, i) =>
+        i === selectedTemplateIndex
+          ? { ...t, layers: [...t.layers, localNewLayer] }
+          : t
+      ));
+
+      setLayerStates(prev => ({
+        ...prev,
+        [layerSlug]: {
+          id: layerSlug,
+          visible: true,
+          locked: false,
+          color: PRESET_COLORS[currentTemplate.layers.length % PRESET_COLORS.length]
+        }
+      }));
+
+      setNewLayerName('');
+      setShowNewLayerModal(false);
+      setSelectedLayerId(layerSlug);
+      setIsDirty(true);
+
+      await refresh();
+    } catch (error) {
+      console.error('Failed to create layer:', error);
+      setSaveError('Failed to create layer');
+    }
+  };
+
+  const handleDeleteLayer = async (layerId: string) => {
+    const layer = currentTemplate?.layers.find(l => l.id === layerId);
+    if (!layer?.dbId) return;
+
+    try {
+      await deleteLayer(layer.dbId);
+
+      setLocalTemplates(prev => prev.map((t, i) =>
+        i === selectedTemplateIndex
+          ? { ...t, layers: t.layers.filter(l => l.id !== layerId) }
+          : t
+      ));
+
+      if (selectedLayerId === layerId) {
+        setSelectedLayerId(null);
+      }
+
+      setShowDeleteConfirm(null);
+      setIsDirty(true);
+
+      await refresh();
+    } catch (error) {
+      console.error('Failed to delete layer:', error);
+      setSaveError('Failed to delete layer');
+    }
+  };
+
+  const handleRenameLayer = async (layerId: string) => {
+    if (!editLayerNameValue.trim()) {
+      setEditingLayerName(null);
+      return;
+    }
+
+    const layer = currentTemplate?.layers.find(l => l.id === layerId);
+    if (!layer?.dbId) return;
+
+    try {
+      await updateLayer(layer.dbId, { label: editLayerNameValue.trim() });
+
+      setLocalTemplates(prev => prev.map((t, i) =>
+        i === selectedTemplateIndex
+          ? {
+              ...t,
+              layers: t.layers.map(l =>
+                l.id === layerId ? { ...l, label: editLayerNameValue.trim() } : l
+              )
+            }
+          : t
+      ));
+
+      setEditingLayerName(null);
+      setIsDirty(true);
+
+      await refresh();
+    } catch (error) {
+      console.error('Failed to rename layer:', error);
+      setSaveError('Failed to rename layer');
+    }
+  };
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !uploadTarget || !currentTemplate) return;
+
+    const file = files[0];
+    if (!file.name.endsWith('.svg')) {
+      setSaveError('Please upload an SVG file');
+      return;
+    }
+
+    try {
+      const content = await file.text();
+      const paths = extractPathsFromSVG(content);
+
+      if (paths.length === 0) {
+        setSaveError('No paths found in SVG file');
+        return;
+      }
+
+      const layer = currentTemplate.layers.find(l => l.id === uploadTarget.layerId);
+      if (!layer?.dbId) {
+        setSaveError('Layer not found');
+        return;
+      }
+
+      await updateLayerPath(layer.dbId, garmentType, uploadTarget.side, paths);
+
+      setLocalTemplates(prev => prev.map((t, i) =>
+        i === selectedTemplateIndex
+          ? {
+              ...t,
+              layers: t.layers.map(l =>
+                l.id === uploadTarget.layerId
+                  ? {
+                      ...l,
+                      paths: {
+                        ...l.paths,
+                        [garmentType]: {
+                          ...l.paths[garmentType],
+                          [uploadTarget.side]: paths
+                        }
+                      },
+                      isModified: true
+                    }
+                  : l
+              )
+            }
+          : t
+      ));
+
+      setShowUploadModal(false);
+      setUploadTarget(null);
+      setIsDirty(true);
+
+      await refresh();
+    } catch (error) {
+      console.error('Failed to upload SVG:', error);
+      setSaveError('Failed to process SVG file');
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    handleFileUpload(e.dataTransfer.files);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await refresh();
+      setIsDirty(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (error) {
+      console.error('Failed to save:', error);
+      setSaveError('Failed to save changes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openUploadModal = (layerId: string, side: 'front' | 'back') => {
+    setUploadTarget({ layerId, side });
+    setShowUploadModal(true);
   };
 
   const renderGarmentCanvas = (side: 'front' | 'back') => {
@@ -164,7 +458,7 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
               strokeWidth="2"
             />
 
-            {currentTemplate.layers.map((layer, index) => {
+            {currentTemplate.layers.map((layer) => {
               const state = layerStates[layer.id];
               if (!state?.visible) return null;
 
@@ -247,6 +541,11 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
             <span className="text-neutral-500">-</span>
             <span className="text-neutral-400">{sport.label}</span>
           </div>
+          {isDirty && (
+            <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">
+              Unsaved changes
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -306,17 +605,26 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
 
           <div className="h-6 w-px bg-neutral-800" />
 
-          {isDirty && (
-            <button
-              onClick={() => {
-                setIsDirty(false);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-accent text-black font-bold uppercase text-xs rounded-lg hover:bg-brand-accent/90 transition-all"
-            >
-              <Save size={14} />
-              Save
-            </button>
+          {saveSuccess && (
+            <span className="flex items-center gap-1 text-xs text-green-500">
+              <Check size={14} /> Saved
+            </span>
           )}
+
+          {saveError && (
+            <span className="flex items-center gap-1 text-xs text-red-500">
+              <AlertCircle size={14} /> {saveError}
+            </span>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 bg-brand-accent text-black font-bold uppercase text-xs rounded-lg hover:bg-brand-accent/90 transition-all disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSaving ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
 
@@ -326,12 +634,13 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
             <h3 className="text-xs font-bold uppercase text-neutral-400">Design Templates</h3>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-2">
-            {templates.length === 0 ? (
+            {localTemplates.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-xs text-neutral-600">No templates yet</p>
+                <p className="text-xs text-neutral-700 mt-1">Create one to get started</p>
               </div>
             ) : (
-              templates.map((template, index) => (
+              localTemplates.map((template, index) => (
                 <button
                   key={template.id}
                   onClick={() => handleTemplateChange(index)}
@@ -373,7 +682,10 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
             )}
           </div>
           <div className="p-2 border-t border-neutral-800">
-            <button className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-dashed border-neutral-700 rounded-lg text-neutral-500 hover:border-brand-accent hover:text-brand-accent transition-all text-xs">
+            <button
+              onClick={() => setShowNewTemplateModal(true)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-dashed border-neutral-700 rounded-lg text-neutral-500 hover:border-brand-accent hover:text-brand-accent transition-all text-xs"
+            >
               <Plus size={14} />
               New Template
             </button>
@@ -390,10 +702,18 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
               }}
             />
 
-            <div className="relative z-10 flex gap-12 items-start">
-              {(viewSide === 'front' || viewSide === 'both') && renderGarmentCanvas('front')}
-              {(viewSide === 'back' || viewSide === 'both') && renderGarmentCanvas('back')}
-            </div>
+            {currentTemplate ? (
+              <div className="relative z-10 flex gap-12 items-start">
+                {(viewSide === 'front' || viewSide === 'both') && renderGarmentCanvas('front')}
+                {(viewSide === 'back' || viewSide === 'both') && renderGarmentCanvas('back')}
+              </div>
+            ) : (
+              <div className="text-center text-neutral-600">
+                <Layers size={48} className="mx-auto mb-4 opacity-30" />
+                <p className="text-lg font-bold">No Template Selected</p>
+                <p className="text-sm mt-2">Create a template to start designing</p>
+              </div>
+            )}
           </div>
 
           {currentTemplate && (
@@ -402,7 +722,7 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                 {currentTemplate.label}
               </span>
               <div className="h-8 w-px bg-neutral-800 shrink-0" />
-              {templates.map((template, index) => (
+              {localTemplates.map((template, index) => (
                 <button
                   key={template.id}
                   onClick={() => handleTemplateChange(index)}
@@ -430,17 +750,17 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
           <div className="border-b border-neutral-800">
             <div className="flex">
               <button
-                onClick={() => { setShowLayerPanel(true); setShowColorPanel(false); }}
+                onClick={() => setActivePanel('layers')}
                 className={`flex-1 px-4 py-3 text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${
-                  showLayerPanel && !showColorPanel ? 'text-brand-accent border-b-2 border-brand-accent' : 'text-neutral-500 hover:text-white'
+                  activePanel === 'layers' ? 'text-brand-accent border-b-2 border-brand-accent' : 'text-neutral-500 hover:text-white'
                 }`}
               >
                 <Layers size={14} /> Layers
               </button>
               <button
-                onClick={() => { setShowColorPanel(true); setShowLayerPanel(false); }}
+                onClick={() => setActivePanel('colors')}
                 className={`flex-1 px-4 py-3 text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${
-                  showColorPanel && !showLayerPanel ? 'text-brand-accent border-b-2 border-brand-accent' : 'text-neutral-500 hover:text-white'
+                  activePanel === 'colors' ? 'text-brand-accent border-b-2 border-brand-accent' : 'text-neutral-500 hover:text-white'
                 }`}
               >
                 <Palette size={14} /> Colors
@@ -449,12 +769,13 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {showLayerPanel && currentTemplate && (
+            {activePanel === 'layers' && currentTemplate && (
               <div className="p-4 space-y-2">
                 {currentTemplate.layers.length === 0 ? (
                   <div className="text-center py-8">
                     <Layers size={32} className="mx-auto text-neutral-700 mb-2" />
-                    <p className="text-xs text-neutral-600">No layers in this template</p>
+                    <p className="text-xs text-neutral-600">No layers yet</p>
+                    <p className="text-xs text-neutral-700 mt-1">Add a layer to start designing</p>
                   </div>
                 ) : (
                   currentTemplate.layers.map((layer) => {
@@ -464,14 +785,16 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                     return (
                       <div
                         key={layer.id}
-                        onClick={() => !state?.locked && setSelectedLayerId(layer.id)}
-                        className={`group bg-neutral-900 rounded-lg border-2 transition-all cursor-pointer ${
+                        className={`group bg-neutral-900 rounded-lg border-2 transition-all ${
                           isSelected
                             ? 'border-brand-accent shadow-lg shadow-brand-accent/10'
                             : 'border-neutral-800 hover:border-neutral-700'
                         }`}
                       >
-                        <div className="flex items-center gap-2 p-3">
+                        <div
+                          className="flex items-center gap-2 p-3 cursor-pointer"
+                          onClick={() => !state?.locked && setSelectedLayerId(layer.id)}
+                        >
                           <div className="cursor-grab text-neutral-600 hover:text-neutral-400">
                             <GripVertical size={14} />
                           </div>
@@ -482,19 +805,44 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                           />
 
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{layer.label}</p>
+                            {editingLayerName === layer.id ? (
+                              <input
+                                type="text"
+                                value={editLayerNameValue}
+                                onChange={(e) => setEditLayerNameValue(e.target.value)}
+                                onBlur={() => handleRenameLayer(layer.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleRenameLayer(layer.id);
+                                  if (e.key === 'Escape') setEditingLayerName(null);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full px-1 py-0.5 bg-neutral-800 border border-brand-accent rounded text-sm text-white"
+                                autoFocus
+                              />
+                            ) : (
+                              <p
+                                className="text-sm font-medium text-white truncate"
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingLayerName(layer.id);
+                                  setEditLayerNameValue(layer.label);
+                                }}
+                              >
+                                {layer.label}
+                              </p>
+                            )}
                             <p className="text-[10px] text-neutral-500">
                               {layer.paths[garmentType].front.length + layer.paths[garmentType].back.length} paths
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id); }}
-                              className="p-1 hover:bg-neutral-800 rounded"
+                              className="p-1 hover:bg-neutral-800 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                               title={state?.visible ? 'Hide' : 'Show'}
                             >
-                              {state?.visible ? (
+                              {state?.visible !== false ? (
                                 <Eye size={14} className="text-neutral-400" />
                               ) : (
                                 <EyeOff size={14} className="text-neutral-600" />
@@ -502,7 +850,7 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                             </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleLayerLock(layer.id); }}
-                              className="p-1 hover:bg-neutral-800 rounded"
+                              className="p-1 hover:bg-neutral-800 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                               title={state?.locked ? 'Unlock' : 'Lock'}
                             >
                               {state?.locked ? (
@@ -511,39 +859,68 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                                 <Unlock size={14} className="text-neutral-400" />
                               )}
                             </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(layer.id); }}
+                              className="p-1 hover:bg-red-900/50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Delete layer"
+                            >
+                              <Trash2 size={14} className="text-red-500" />
+                            </button>
                           </div>
                         </div>
 
                         {isSelected && (
-                          <div className="px-3 pb-3 pt-1 border-t border-neutral-800 mt-1">
-                            <label className="text-[10px] text-neutral-500 uppercase mb-2 block">Layer Color</label>
-                            <div className="grid grid-cols-6 gap-1">
-                              {PRESET_COLORS.map((color) => (
-                                <button
-                                  key={color}
-                                  onClick={(e) => { e.stopPropagation(); handleLayerColorChange(layer.id, color); }}
-                                  className={`w-full aspect-square rounded border-2 transition-all ${
-                                    state?.color === color ? 'border-white scale-110' : 'border-transparent hover:border-neutral-600'
-                                  }`}
-                                  style={{ backgroundColor: color }}
+                          <div className="px-3 pb-3 pt-1 border-t border-neutral-800 mt-1 space-y-3">
+                            <div>
+                              <label className="text-[10px] text-neutral-500 uppercase mb-2 block">Layer Color</label>
+                              <div className="grid grid-cols-6 gap-1">
+                                {PRESET_COLORS.map((color) => (
+                                  <button
+                                    key={color}
+                                    onClick={(e) => { e.stopPropagation(); handleLayerColorChange(layer.id, color); }}
+                                    className={`w-full aspect-square rounded border-2 transition-all ${
+                                      state?.color === color ? 'border-white scale-110' : 'border-transparent hover:border-neutral-600'
+                                    }`}
+                                    style={{ backgroundColor: color }}
+                                  />
+                                ))}
+                              </div>
+                              <div className="mt-2 flex gap-2">
+                                <input
+                                  type="color"
+                                  value={state?.color || '#D2F802'}
+                                  onChange={(e) => handleLayerColorChange(layer.id, e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-8 h-8 rounded border border-neutral-700 cursor-pointer"
                                 />
-                              ))}
+                                <input
+                                  type="text"
+                                  value={state?.color || '#D2F802'}
+                                  onChange={(e) => handleLayerColorChange(layer.id, e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex-1 px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-xs font-mono text-white"
+                                />
+                              </div>
                             </div>
-                            <div className="mt-2 flex gap-2">
-                              <input
-                                type="color"
-                                value={state?.color || '#D2F802'}
-                                onChange={(e) => handleLayerColorChange(layer.id, e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-8 h-8 rounded border border-neutral-700 cursor-pointer"
-                              />
-                              <input
-                                type="text"
-                                value={state?.color || '#D2F802'}
-                                onChange={(e) => handleLayerColorChange(layer.id, e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex-1 px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-xs font-mono text-white"
-                              />
+
+                            <div>
+                              <label className="text-[10px] text-neutral-500 uppercase mb-2 block">Upload SVG Paths</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openUploadModal(layer.id, 'front'); }}
+                                  className="flex items-center justify-center gap-1 px-2 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded text-xs transition-colors"
+                                >
+                                  <Upload size={12} />
+                                  Front ({layer.paths[garmentType].front.length})
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openUploadModal(layer.id, 'back'); }}
+                                  className="flex items-center justify-center gap-1 px-2 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded text-xs transition-colors"
+                                >
+                                  <Upload size={12} />
+                                  Back ({layer.paths[garmentType].back.length})
+                                </button>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -551,14 +928,22 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                     );
                   })
                 )}
+
+                <button
+                  onClick={() => setShowNewLayerModal(true)}
+                  disabled={!currentTemplate.dbId}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-dashed border-neutral-700 rounded-lg text-neutral-500 hover:border-brand-accent hover:text-brand-accent transition-all text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} />
+                  Add Layer
+                </button>
               </div>
             )}
 
-            {showColorPanel && (
+            {activePanel === 'colors' && (
               <div className="p-4 space-y-4">
                 <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
                   <h4 className="text-xs font-bold uppercase text-neutral-400 mb-3">Base Colors</h4>
-
                   <div className="space-y-3">
                     <div>
                       <label className="text-[10px] text-neutral-500 uppercase mb-1 block">Primary (Base)</label>
@@ -577,7 +962,6 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                         />
                       </div>
                     </div>
-
                     <div>
                       <label className="text-[10px] text-neutral-500 uppercase mb-1 block">Secondary (Fill)</label>
                       <div className="flex gap-2">
@@ -595,7 +979,6 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                         />
                       </div>
                     </div>
-
                     <div>
                       <label className="text-[10px] text-neutral-500 uppercase mb-1 block">Accent (Trim)</label>
                       <div className="flex gap-2">
@@ -652,6 +1035,188 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
           </div>
         </div>
       </div>
+
+      {showNewTemplateModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold uppercase">New Template</h3>
+              <button
+                onClick={() => { setShowNewTemplateModal(false); setNewTemplateName(''); }}
+                className="text-neutral-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-neutral-400 uppercase mb-2">
+                Template Name
+              </label>
+              <input
+                type="text"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="e.g., Lightning Bolt, Stripes"
+                className="w-full px-4 py-3 bg-black border border-neutral-800 rounded-lg text-white placeholder-neutral-600 focus:border-brand-accent outline-none"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateTemplate()}
+              />
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setShowNewTemplateModal(false); setNewTemplateName(''); }}
+                className="flex-1 px-4 py-3 bg-neutral-800 text-white font-bold uppercase text-sm rounded-lg hover:bg-neutral-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateTemplate}
+                disabled={!newTemplateName.trim() || creatingTemplate}
+                className="flex-1 px-4 py-3 bg-brand-accent text-black font-bold uppercase text-sm rounded-lg hover:bg-brand-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {creatingTemplate && <Loader2 size={16} className="animate-spin" />}
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNewLayerModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold uppercase">Add Layer</h3>
+              <button
+                onClick={() => { setShowNewLayerModal(false); setNewLayerName(''); }}
+                className="text-neutral-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-neutral-400 uppercase mb-2">
+                Layer Name
+              </label>
+              <input
+                type="text"
+                value={newLayerName}
+                onChange={(e) => setNewLayerName(e.target.value)}
+                placeholder="e.g., Side Panel, Chevron"
+                className="w-full px-4 py-3 bg-black border border-neutral-800 rounded-lg text-white placeholder-neutral-600 focus:border-brand-accent outline-none"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleAddLayer()}
+              />
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setShowNewLayerModal(false); setNewLayerName(''); }}
+                className="flex-1 px-4 py-3 bg-neutral-800 text-white font-bold uppercase text-sm rounded-lg hover:bg-neutral-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddLayer}
+                disabled={!newLayerName.trim()}
+                className="flex-1 px-4 py-3 bg-brand-accent text-black font-bold uppercase text-sm rounded-lg hover:bg-brand-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Add Layer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUploadModal && uploadTarget && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-lg w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-bold uppercase">Upload SVG</h3>
+                <p className="text-sm text-neutral-400 mt-1">
+                  {uploadTarget.side} view for {garmentType}
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowUploadModal(false); setUploadTarget(null); }}
+                className="text-neutral-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+                dragOver
+                  ? 'border-brand-accent bg-brand-accent/10'
+                  : 'border-neutral-700 hover:border-neutral-600'
+              }`}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+            >
+              <FileUp size={48} className="mx-auto text-neutral-600 mb-4" />
+              <p className="text-neutral-400 mb-2">
+                Drag and drop your SVG file here
+              </p>
+              <p className="text-neutral-600 text-sm mb-4">or</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".svg"
+                onChange={(e) => handleFileUpload(e.target.files)}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-6 py-2 bg-brand-accent text-black font-bold uppercase text-sm rounded-lg hover:bg-brand-accent/90 transition-colors"
+              >
+                Browse Files
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-600 mt-4 text-center">
+              Upload an SVG file containing path elements. All paths will be extracted and added to this layer.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <AlertCircle size={20} className="text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold">Delete Layer?</h3>
+            </div>
+
+            <p className="text-neutral-400 text-sm mb-6">
+              This will permanently delete this layer and all its paths. This action cannot be undone.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="flex-1 px-4 py-2 bg-neutral-800 text-white font-bold uppercase text-sm rounded-lg hover:bg-neutral-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteLayer(showDeleteConfirm)}
+                className="flex-1 px-4 py-2 bg-red-600 text-white font-bold uppercase text-sm rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
