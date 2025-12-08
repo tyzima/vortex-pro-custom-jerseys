@@ -38,6 +38,8 @@ interface CustomizerProps {
     editingItemId?: string | null;
     editingItem?: CartItem;
     onCheckout?: () => void;
+    initialTemplate?: { sport: string; cut: string; template: string } | null;
+    onBackToGallery?: () => void;
 }
 
 // Memoized Thumbnail Component to prevent re-renders
@@ -86,7 +88,7 @@ const Thumbnail = React.memo(({ id, sport, cut, template, colors, garmentType }:
     );
 });
 
-export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCartItem, editingItemId, editingItem, onCheckout }) => {
+export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCartItem, editingItemId, editingItem, onCheckout, initialTemplate, onBackToGallery }) => {
     const { theme, toggleTheme } = useTheme();
     const { library: SPORTS_LIBRARY, loading: libraryLoading, error: libraryError } = useTemplateLibrary();
     const [view, setView] = useState<ViewSide>('front');
@@ -132,6 +134,47 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
             setDesign(JSON.parse(JSON.stringify(editingItem.design)));
         }
     }, [editingItem]);
+
+    // Load initial template when selected from gallery
+    useEffect(() => {
+        if (initialTemplate && !editingItem) {
+            const sport = SPORTS_LIBRARY.find(s => s.id === initialTemplate.sport);
+            const template = sport?.templates.find(t => t.id === initialTemplate.template);
+
+            if (sport && template) {
+                const newZones: Record<string, ZoneStyle> = {};
+                template.layers.forEach((layer, index) => {
+                    newZones[layer.id] = {
+                        color: index === 0 ? '#ffffff' : '#0a0a0a',
+                        pattern: 'none',
+                        patternColor: '#000000',
+                        patternMode: 'ghost'
+                    };
+                });
+
+                setDesign({
+                    sport: initialTemplate.sport,
+                    cut: initialTemplate.cut,
+                    garmentType: 'jersey',
+                    template: initialTemplate.template,
+                    zones: newZones,
+                    textElements: [
+                        { id: 'frontTeam', text: 'VORTEX', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 180 }, size: 32, rotation: 0, view: 'front', isLocked: true, isDynamic: false },
+                        { id: 'frontNumber', text: '24', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 320 }, size: 120, rotation: 0, view: 'front', isLocked: true, isDynamic: true },
+                        { id: 'backName', text: 'CHAMPION', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 150 }, size: 36, rotation: 0, view: 'back', isLocked: true, isDynamic: true },
+                        { id: 'backNumber', text: '24', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 320 }, size: 140, rotation: 0, view: 'back', isLocked: true, isDynamic: true }
+                    ],
+                    logos: []
+                });
+
+                if (template.layers.length > 0) {
+                    setActiveZoneId(template.layers[0].id);
+                }
+
+                setCurrentStep(2);
+            }
+        }
+    }, [initialTemplate, SPORTS_LIBRARY, editingItem]);
 
     // State for the "Colors" step - which zone is currently being edited
     const [activeZoneId, setActiveZoneId] = useState<string>('body');
@@ -599,23 +642,23 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
             setShowSuccessModal(false);
 
             if (action === 'add_another') {
-                // Reset Logic
-                setCurrentStep(1);
-                // Reset design but keep sport/cut settings maybe? Or full reset?
-                // User requested "go back to setup tab" so complete reset makes sense, 
-                // but keeping the sport selected is user friendly.
-                // Resetting to defaults:
-                setDesign(prev => ({
-                    ...prev,
-                    zones: JSON.parse(JSON.stringify(DEFAULT_ZONES)),
-                    textElements: [
-                        { id: 'frontTeam', text: 'VORTEX', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 180 }, size: 32, rotation: 0, view: 'front', isLocked: true, isDynamic: false },
-                        { id: 'frontNumber', text: '24', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 320 }, size: 120, rotation: 0, view: 'front', isLocked: true, isDynamic: true },
-                        { id: 'backName', text: 'CHAMPION', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 150 }, size: 36, rotation: 0, view: 'back', isLocked: true, isDynamic: true },
+                if (onBackToGallery) {
+                    onBackToGallery();
+                } else {
+                    // Reset Logic
+                    setCurrentStep(1);
+                    setDesign(prev => ({
+                        ...prev,
+                        zones: JSON.parse(JSON.stringify(DEFAULT_ZONES)),
+                        textElements: [
+                            { id: 'frontTeam', text: 'VORTEX', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 180 }, size: 32, rotation: 0, view: 'front', isLocked: true, isDynamic: false },
+                            { id: 'frontNumber', text: '24', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 320 }, size: 120, rotation: 0, view: 'front', isLocked: true, isDynamic: true },
+                            { id: 'backName', text: 'CHAMPION', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 150 }, size: 36, rotation: 0, view: 'back', isLocked: true, isDynamic: true },
                         { id: 'backNumber', text: '24', font: 'Anton', color: '#0a0a0a', outline: '#ffffff', outlineWidth: 2, position: { x: 200, y: 320 }, size: 140, rotation: 0, view: 'back', isLocked: true, isDynamic: true }
                     ],
                     logos: []
-                }));
+                    }));
+                }
             } else {
                 if (onCheckout) onCheckout();
             }
@@ -1997,6 +2040,14 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
 
                         {/* Navigation Actions - Fixed at bottom of sidebar */}
                         <div className="p-6 border-t border-brand-border flex gap-3 bg-brand-black/20 shrink-0 relative z-50 backdrop-blur-md">
+                            {onBackToGallery && currentStep === 2 && (
+                                <button
+                                    onClick={onBackToGallery}
+                                    className="px-4 py-4 rounded-2xl font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ease-out border border-brand-border bg-brand-black/50 text-neutral-400 hover:text-white hover:border-brand-accent"
+                                >
+                                    <ChevronLeft size={18} />
+                                </button>
+                            )}
                             {currentStep < (design.garmentType === 'shorts' ? 3 : 4) ? (
                                 <button
                                     onClick={handleNext}
