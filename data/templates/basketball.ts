@@ -69,12 +69,12 @@ export const basketball: SportDefinition = {
           label: 'Pinstripes',
           paths: {
             jersey: {
-              front: "M130 20 L130 480 M170 40 L170 480 M210 50 L210 480 M250 50 L250 480 M290 40 L290 480",
-              back: "M130 20 L130 480 M170 40 L170 480 M210 50 L210 480 M250 50 L250 480 M290 40 L290 480"
+              front: ["M130 20 L130 480 M170 40 L170 480 M210 50 L210 480 M250 50 L250 480 M290 40 L290 480"],
+              back: ["M130 20 L130 480 M170 40 L170 480 M210 50 L210 480 M250 50 L250 480 M290 40 L290 480"]
             },
             shorts: {
-              front: "M130 80 L130 370 M170 80 L170 370 M230 80 L230 370 M270 80 L270 370",
-              back: "M130 80 L130 370 M170 80 L170 370 M230 80 L230 370 M270 80 L270 370"
+              front: ["M130 80 L130 370 M170 80 L170 370 M230 80 L230 370 M270 80 L270 370"],
+              back: ["M130 80 L130 370 M170 80 L170 370 M230 80 L230 370 M270 80 L270 370"]
             }
           }
         }
@@ -89,13 +89,12 @@ export const basketball: SportDefinition = {
           label: 'Side Panels',
           paths: {
             jersey: {
-              // Swooping side panel similar to the SVG reference flow
-              front: "M85 280 L85 460 L120 460 C120 350 110 150 95 100 Z M315 280 L315 460 L280 460 C280 350 290 150 305 100 Z",
-              back: "M85 280 L85 460 L120 460 C120 350 110 150 95 100 Z M315 280 L315 460 L280 460 C280 350 290 150 305 100 Z"
+              front: ["M85 280 L85 460 L120 460 C120 350 110 150 95 100 Z M315 280 L315 460 L280 460 C280 350 290 150 305 100 Z"],
+              back: ["M85 280 L85 460 L120 460 C120 350 110 150 95 100 Z M315 280 L315 460 L280 460 C280 350 290 150 305 100 Z"]
             },
             shorts: {
-              front: "M90 80 L95 360 L125 370 L130 80 Z M310 80 L305 360 L275 370 L270 80 Z",
-              back: "M90 80 L95 360 L125 370 L130 80 Z M310 80 L305 360 L275 370 L270 80 Z"
+              front: ["M90 80 L95 360 L125 370 L130 80 Z M310 80 L305 360 L275 370 L270 80 Z"],
+              back: ["M90 80 L95 360 L125 370 L130 80 Z M310 80 L305 360 L275 370 L270 80 Z"]
             }
           }
         }
@@ -110,14 +109,12 @@ export const basketball: SportDefinition = {
           label: 'Wishbone',
           paths: {
             jersey: {
-              // The "Y" shape collar often seen in college/pro
-              front: "M110 20 L200 120 L290 20 L280 15 L200 100 L120 15 Z",
-              back: "M110 20 C145 30 255 30 290 20 L290 30 C255 40 145 40 110 30 Z"
+              front: ["M110 20 L200 120 L290 20 L280 15 L200 100 L120 15 Z"],
+              back: ["M110 20 C145 30 255 30 290 20 L290 30 C255 40 145 40 110 30 Z"]
             },
             shorts: {
-              // Matching belt buckle accent
-              front: "M180 50 L220 50 L220 80 L180 80 Z",
-              back: ""
+              front: ["M180 50 L220 50 L220 80 L180 80 Z"],
+              back: []
             }
           }
         }
@@ -132,14 +129,12 @@ export const basketball: SportDefinition = {
           label: 'Horizon Line',
           paths: {
             jersey: {
-              // A thick chest band (like Jazz/Nuggets styles)
-              front: "M75 300 L325 300 L325 360 L75 360 Z M75 380 L325 380 L325 400 L75 400 Z",
-              back: "M75 300 L325 300 L325 360 L75 360 Z M75 380 L325 380 L325 400 L75 400 Z"
+              front: ["M75 300 L325 300 L325 360 L75 360 Z M75 380 L325 380 L325 400 L75 400 Z"],
+              back: ["M75 300 L325 300 L325 360 L75 360 Z M75 380 L325 380 L325 400 L75 400 Z"]
             },
             shorts: {
-              // Asymmetrical leg bands
-              front: "M95 300 L195 300 L200 370 L100 370 Z",
-              back: "M95 300 L195 300 L200 370 L100 370 Z"
+              front: ["M95 300 L195 300 L200 370 L100 370 Z"],
+              back: ["M95 300 L195 300 L200 370 L100 370 Z"]
             }
           }
         }

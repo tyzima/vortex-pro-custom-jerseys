@@ -199,18 +199,23 @@ export async function getSportDefinition(sportSlug: string): Promise<SportDefini
     const layers: DesignLayer[] = (template.template_layers || []).map((layer: any) => {
       const layerPaths = layer.layer_paths || [];
 
+      const jerseyFrontPaths = layerPaths.filter((p: LayerPath) => p.garment_type === 'jersey' && p.side === 'front').map((p: LayerPath) => p.svg_path);
+      const jerseyBackPaths = layerPaths.filter((p: LayerPath) => p.garment_type === 'jersey' && p.side === 'back').map((p: LayerPath) => p.svg_path);
+      const shortsFrontPaths = layerPaths.filter((p: LayerPath) => p.garment_type === 'shorts' && p.side === 'front').map((p: LayerPath) => p.svg_path);
+      const shortsBackPaths = layerPaths.filter((p: LayerPath) => p.garment_type === 'shorts' && p.side === 'back').map((p: LayerPath) => p.svg_path);
+
       return {
         id: layer.layer_slug,
         dbId: layer.id,
         label: layer.label,
         paths: {
           jersey: {
-            front: layerPaths.find((p: LayerPath) => p.garment_type === 'jersey' && p.side === 'front')?.svg_path || '',
-            back: layerPaths.find((p: LayerPath) => p.garment_type === 'jersey' && p.side === 'back')?.svg_path || ''
+            front: jerseyFrontPaths,
+            back: jerseyBackPaths
           },
           shorts: {
-            front: layerPaths.find((p: LayerPath) => p.garment_type === 'shorts' && p.side === 'front')?.svg_path || '',
-            back: layerPaths.find((p: LayerPath) => p.garment_type === 'shorts' && p.side === 'back')?.svg_path || ''
+            front: shortsFrontPaths,
+            back: shortsBackPaths
           }
         }
       };
@@ -357,10 +362,46 @@ export async function createTemplate(data: {
   label: string;
   display_order: number;
   is_published?: boolean;
-}): Promise<Template> {
+}): Promise<Template>;
+export async function createTemplate(
+  sportId: string,
+  cutSlug: string,
+  slug: string,
+  label: string,
+  displayOrder?: number,
+  isPublished?: boolean
+): Promise<Template>;
+export async function createTemplate(
+  dataOrSportId: {
+    sport_id: string;
+    slug: string;
+    label: string;
+    display_order: number;
+    is_published?: boolean;
+  } | string,
+  cutSlug?: string,
+  slug?: string,
+  label?: string,
+  displayOrder: number = 0,
+  isPublished: boolean = true
+): Promise<Template> {
+  let insertData;
+
+  if (typeof dataOrSportId === 'string') {
+    insertData = {
+      sport_id: dataOrSportId,
+      slug: slug!,
+      label: label!,
+      display_order: displayOrder,
+      is_published: isPublished
+    };
+  } else {
+    insertData = dataOrSportId;
+  }
+
   const { data: template, error } = await supabase
     .from('sport_templates')
-    .insert(data)
+    .insert(insertData)
     .select()
     .single();
 
@@ -392,10 +433,38 @@ export async function deleteTemplate(id: string): Promise<void> {
 export async function createLayer(
   templateId: string,
   data: { layer_slug: string; label: string; display_order: number }
+): Promise<Layer>;
+export async function createLayer(
+  templateId: string,
+  layerSlug: string,
+  label: string,
+  displayOrder?: number
+): Promise<Layer>;
+export async function createLayer(
+  templateId: string,
+  dataOrSlug: { layer_slug: string; label: string; display_order: number } | string,
+  label?: string,
+  displayOrder: number = 0
 ): Promise<Layer> {
+  let insertData;
+
+  if (typeof dataOrSlug === 'string') {
+    insertData = {
+      template_id: templateId,
+      layer_slug: dataOrSlug,
+      label: label!,
+      display_order: displayOrder
+    };
+  } else {
+    insertData = {
+      template_id: templateId,
+      ...dataOrSlug
+    };
+  }
+
   const { data: layer, error } = await supabase
     .from('template_layers')
-    .insert({ ...data, template_id: templateId })
+    .insert(insertData)
     .select()
     .single();
 
@@ -428,34 +497,30 @@ export async function updateLayerPath(
   layerId: string,
   garmentType: 'jersey' | 'shorts',
   side: 'front' | 'back',
-  svgPath: string
+  svgPath: string | string[]
 ): Promise<void> {
-  const { data: existing, error: fetchError } = await supabase
+  const paths = Array.isArray(svgPath) ? svgPath : [svgPath];
+
+  const { error: deleteError } = await supabase
     .from('layer_paths')
-    .select('id')
+    .delete()
     .eq('layer_id', layerId)
     .eq('garment_type', garmentType)
-    .eq('side', side)
-    .maybeSingle();
+    .eq('side', side);
 
-  if (fetchError) throw fetchError;
+  if (deleteError) throw deleteError;
 
-  if (existing) {
-    const { error: updateError } = await supabase
-      .from('layer_paths')
-      .update({ svg_path: svgPath })
-      .eq('id', existing.id);
+  if (paths.length > 0) {
+    const insertData = paths.map(path => ({
+      layer_id: layerId,
+      garment_type: garmentType,
+      side,
+      svg_path: path
+    }));
 
-    if (updateError) throw updateError;
-  } else {
     const { error: insertError } = await supabase
       .from('layer_paths')
-      .insert({
-        layer_id: layerId,
-        garment_type: garmentType,
-        side,
-        svg_path: svgPath
-      });
+      .insert(insertData);
 
     if (insertError) throw insertError;
   }

@@ -99,8 +99,8 @@ export interface DesignLayer {
   dbId?: string;
   label: string;
   paths: {
-    jersey: { front: string; back: string };
-    shorts: { front: string; back: string };
+    jersey: { front: string[]; back: string[] };
+    shorts: { front: string[]; back: string[] };
   };
 }
 
