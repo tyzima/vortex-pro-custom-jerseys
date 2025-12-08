@@ -14,12 +14,16 @@ import { Contact } from './components/overlays/Contact';
 import { HowItWorks } from './components/overlays/HowItWorks';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { Checkout } from './components/Checkout';
+import { AuthPage } from './components/auth/AuthPage';
+import { OrderHistory } from './components/customer/OrderHistory';
 import { CartItem } from './types';
 import { ArrowLeft } from 'lucide-react';
 import { ThemeProvider } from './components/ThemeContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const AppContent = () => {
-  const [view, setView] = useState<'home' | 'builder' | 'admin' | 'checkout'>('home');
+  const { user, profile, loading } = useAuth();
+  const [view, setView] = useState<'home' | 'builder' | 'admin' | 'checkout' | 'auth' | 'orders'>('home');
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
@@ -89,6 +93,40 @@ const AppContent = () => {
 
   const activeOverlayContent = activeOverlay ? getOverlayContent(activeOverlay) : null;
 
+  const handleAdminClick = () => {
+    if (!user) {
+      setView('auth');
+    } else if (profile?.role === 'admin') {
+      setView('admin');
+    }
+  };
+
+  const handleOrdersClick = () => {
+    if (!user) {
+      setView('auth');
+    } else {
+      setView('orders');
+    }
+  };
+
+  const handleCheckoutClick = () => {
+    if (!user) {
+      setView('auth');
+    } else {
+      setView('checkout');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-brand-black flex items-center justify-center">
+        <div className="text-brand-accent text-xl font-bold uppercase tracking-widest animate-pulse">
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-brand-black fixed inset-0 w-full h-full selection:bg-brand-accent selection:text-black flex flex-col">
       <Navbar
@@ -96,7 +134,9 @@ const AppContent = () => {
         onMenuClick={(menu) => setActiveOverlay(menu)}
         onDesignClick={() => setView('builder')}
         cartCount={cart.length}
-        onCartClick={() => setView('checkout')}
+        onCartClick={handleCheckoutClick}
+        onOrdersClick={handleOrdersClick}
+        onAuthClick={() => setView('auth')}
         currentView={view}
       />
 
@@ -112,13 +152,23 @@ const AppContent = () => {
         </Overlay>
       )}
 
+      {/* AUTH VIEW */}
+      {view === 'auth' && (
+        <AuthPage onBack={() => setView('home')} />
+      )}
+
       {/* ADMIN DASHBOARD */}
-      {view === 'admin' && (
+      {view === 'admin' && profile?.role === 'admin' && (
         <AdminDashboard onExit={() => setView('home')} />
       )}
 
+      {/* CUSTOMER ORDER HISTORY */}
+      {view === 'orders' && user && (
+        <OrderHistory onBack={() => setView('home')} />
+      )}
+
       {/* CHECKOUT VIEW */}
-      {view === 'checkout' && (
+      {view === 'checkout' && user && (
         <Checkout
           cart={cart}
           onRemoveItem={handleRemoveFromCart}
@@ -128,6 +178,7 @@ const AppContent = () => {
             setView('builder');
           }}
           onBack={() => setView('builder')}
+          onClearCart={() => setCart([])}
         />
       )}
 
@@ -149,7 +200,9 @@ const AppContent = () => {
                   <a href="#" className="hover:text-brand-white">Privacy</a>
                   <a href="#" className="hover:text-brand-white">Terms</a>
                   <a href="#" className="hover:text-brand-white">Support</a>
-                  <button onClick={() => setView('admin')} className="hover:text-brand-accent transition-colors">Admin</button>
+                  {profile?.role === 'admin' && (
+                    <button onClick={handleAdminClick} className="hover:text-brand-accent transition-colors">Admin</button>
+                  )}
                 </div>
               </div>
             </footer>
@@ -179,7 +232,9 @@ const AppContent = () => {
 const App = () => {
   return (
     <ThemeProvider>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </ThemeProvider>
   );
 };

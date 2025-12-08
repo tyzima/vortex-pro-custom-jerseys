@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { CartItem, RosterEntry } from '../types';
-import { Trash2, ArrowRight, CreditCard, ShieldCheck, Truck, ArrowLeft, Edit2, Users, Download, Upload, Plus, AlertCircle } from 'lucide-react';
+import { Trash2, ArrowRight, CreditCard, ShieldCheck, Truck, ArrowLeft, Edit2, Users, Download, Upload, Plus, AlertCircle, CheckCircle } from 'lucide-react';
 import { JerseySVG } from './JerseySVG';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface CheckoutProps {
     cart: CartItem[];
@@ -9,6 +11,7 @@ interface CheckoutProps {
     onEditItem: (id: string) => void;
     onUpdateCartItem: (id: string, item: CartItem) => void;
     onBack: () => void;
+    onClearCart: () => void;
 }
 
 const RosterTable = ({ item, onUpdate }: { item: CartItem, onUpdate: (roster: RosterEntry[]) => void }) => {
@@ -178,11 +181,24 @@ const RosterTable = ({ item, onUpdate }: { item: CartItem, onUpdate: (roster: Ro
     );
 };
 
-export const Checkout: React.FC<CheckoutProps> = ({ cart, onRemoveItem, onEditItem, onUpdateCartItem, onBack }) => {
+export const Checkout: React.FC<CheckoutProps> = ({ cart, onRemoveItem, onEditItem, onUpdateCartItem, onBack, onClearCart }) => {
+    const { user } = useAuth();
+    const [submitting, setSubmitting] = useState(false);
+    const [orderSuccess, setOrderSuccess] = useState(false);
+    const [orderNumber, setOrderNumber] = useState('');
+    const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        organization: '',
+        address: '',
+        city: '',
+        state: '',
+        zip: '',
+    });
+
     const dynamicItems = cart.filter(item => item.design.textElements.some(t => t.isDynamic));
     const hasDynamicItems = dynamicItems.length > 0;
 
-    // Calculate total quantity from roster entries for dynamic items
     const calculateItemTotal = (item: CartItem) => {
         if (item.design.textElements.some(t => t.isDynamic)) {
             return item.roster?.reduce((acc, entry) => acc + entry.quantity, 0) || 0;
@@ -202,7 +218,6 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onRemoveItem, onEditIt
         }
     };
 
-    // Validation
     const isRosterValid = !hasDynamicItems || dynamicItems.every(item =>
         item.roster &&
         item.roster.length > 0 &&
@@ -212,6 +227,77 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onRemoveItem, onEditIt
                 .every(field => entry.dynamicValues[field.id]?.trim())
         )
     );
+
+    const isFormValid = formData.firstName && formData.lastName && formData.address && formData.city && formData.state && formData.zip;
+
+    const handleSubmit = async () => {
+        if (!user || !isFormValid || !isRosterValid) return;
+
+        setSubmitting(true);
+
+        try {
+            const { data: orderNumberData } = await supabase.rpc('generate_order_number');
+
+            for (const item of cart) {
+                const { error } = await supabase.from('orders').insert({
+                    user_id: user.id,
+                    order_number: orderNumberData,
+                    status: 'pending',
+                    design_data: item.design,
+                    roster_data: item.roster || [],
+                    shipping_info: formData,
+                    subtotal: subtotal,
+                    shipping_cost: shipping,
+                    total: total,
+                });
+
+                if (error) throw error;
+            }
+
+            setOrderNumber(orderNumberData);
+            setOrderSuccess(true);
+            onClearCart();
+        } catch (error) {
+            console.error('Error submitting order:', error);
+            alert('Failed to submit order. Please try again.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    if (orderSuccess) {
+        return (
+            <div className="fixed inset-0 bg-brand-black z-[60] overflow-y-auto pt-24 pb-12 animate-fade-in flex items-center justify-center">
+                <div className="container mx-auto px-6 max-w-2xl">
+                    <div className="bg-brand-card border border-brand-border rounded-2xl p-12 text-center">
+                        <div className="w-20 h-20 bg-brand-accent rounded-full flex items-center justify-center mx-auto mb-6">
+                            <CheckCircle size={40} className="text-black" />
+                        </div>
+                        <h1 className="font-display text-4xl text-brand-white italic uppercase mb-4">
+                            Order Submitted!
+                        </h1>
+                        <p className="text-brand-secondary text-lg mb-2">
+                            Your order has been successfully submitted.
+                        </p>
+                        <p className="text-brand-accent text-2xl font-mono font-bold mb-8">
+                            Order #{orderNumber}
+                        </p>
+                        <p className="text-brand-secondary text-sm mb-8">
+                            We'll send you an email confirmation shortly. You can track your order status in the My Orders section.
+                        </p>
+                        <div className="flex gap-4 justify-center">
+                            <button
+                                onClick={onBack}
+                                className="px-6 py-3 bg-brand-accent text-black font-bold uppercase tracking-widest rounded-xl hover:bg-white transition-all"
+                            >
+                                Continue Shopping
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 bg-brand-black z-[60] overflow-y-auto pt-24 pb-12 animate-fade-in">
@@ -242,32 +328,80 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onRemoveItem, onEditIt
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-brand-secondary uppercase">First Name</label>
-                                    <input type="text" className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none" placeholder="Jordan" />
+                                    <input
+                                        type="text"
+                                        value={formData.firstName}
+                                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                                        required
+                                        className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none"
+                                        placeholder="Jordan"
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-brand-secondary uppercase">Last Name</label>
-                                    <input type="text" className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none" placeholder="Poole" />
+                                    <input
+                                        type="text"
+                                        value={formData.lastName}
+                                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                                        required
+                                        className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none"
+                                        placeholder="Poole"
+                                    />
                                 </div>
                                 <div className="md:col-span-2 space-y-2">
                                     <label className="text-[10px] font-bold text-brand-secondary uppercase">Team / Organization</label>
-                                    <input type="text" className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none" placeholder="Golden State Warriors" />
+                                    <input
+                                        type="text"
+                                        value={formData.organization}
+                                        onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                                        className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none"
+                                        placeholder="Golden State Warriors"
+                                    />
                                 </div>
                                 <div className="md:col-span-2 space-y-2">
                                     <label className="text-[10px] font-bold text-brand-secondary uppercase">Address</label>
-                                    <input type="text" className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none" placeholder="1 Warriors Way" />
+                                    <input
+                                        type="text"
+                                        value={formData.address}
+                                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                        required
+                                        className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none"
+                                        placeholder="1 Warriors Way"
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-brand-secondary uppercase">City</label>
-                                    <input type="text" className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none" placeholder="San Francisco" />
+                                    <input
+                                        type="text"
+                                        value={formData.city}
+                                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                        required
+                                        className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none"
+                                        placeholder="San Francisco"
+                                    />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-bold text-brand-secondary uppercase">State</label>
-                                        <input type="text" className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none" placeholder="CA" />
+                                        <input
+                                            type="text"
+                                            value={formData.state}
+                                            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                                            required
+                                            className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none"
+                                            placeholder="CA"
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-bold text-brand-secondary uppercase">Zip</label>
-                                        <input type="text" className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none" placeholder="94158" />
+                                        <input
+                                            type="text"
+                                            value={formData.zip}
+                                            onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+                                            required
+                                            className="w-full bg-brand-black border border-brand-border rounded p-3 text-brand-white text-sm focus:border-brand-accent outline-none"
+                                            placeholder="94158"
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -315,11 +449,12 @@ export const Checkout: React.FC<CheckoutProps> = ({ cart, onRemoveItem, onEditIt
                         </div>
 
                         <button
-                            disabled={!isRosterValid}
-                            className={`w-full font-bold uppercase tracking-widest py-5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(210,248,2,0.2)] ${isRosterValid ? 'bg-brand-accent hover:bg-white text-black' : 'bg-brand-gray text-brand-secondary cursor-not-allowed shadow-none'}`}
+                            onClick={handleSubmit}
+                            disabled={!isRosterValid || !isFormValid || submitting}
+                            className={`w-full font-bold uppercase tracking-widest py-5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(210,248,2,0.2)] ${(isRosterValid && isFormValid && !submitting) ? 'bg-brand-accent hover:bg-white text-black' : 'bg-brand-gray text-brand-secondary cursor-not-allowed shadow-none'}`}
                         >
-                            <span>Submit Order Request</span>
-                            <ArrowRight size={18} />
+                            <span>{submitting ? 'Submitting...' : 'Submit Order Request'}</span>
+                            {!submitting && <ArrowRight size={18} />}
                         </button>
 
                         <div className="flex items-center justify-center gap-2 text-brand-secondary text-[10px] uppercase font-bold">

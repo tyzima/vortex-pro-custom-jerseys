@@ -1,7 +1,8 @@
 
-import React from 'react';
-import { ShoppingCart, Menu, MessageSquare, Sun, Moon } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingCart, Menu, MessageSquare, Sun, Moon, User, LogOut, Package } from 'lucide-react';
 import { useTheme } from './ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NavbarProps {
   onHomeClick?: () => void;
@@ -9,11 +10,24 @@ interface NavbarProps {
   onDesignClick: () => void;
   cartCount?: number;
   onCartClick?: () => void;
+  onOrdersClick?: () => void;
+  onAuthClick?: () => void;
   currentView?: string;
 }
 
-export const Navbar: React.FC<NavbarProps & { currentView: string }> = ({ onHomeClick, onMenuClick, onDesignClick, cartCount = 0, onCartClick, currentView }) => {
+export const Navbar: React.FC<NavbarProps & { currentView: string }> = ({
+  onHomeClick,
+  onMenuClick,
+  onDesignClick,
+  cartCount = 0,
+  onCartClick,
+  onOrdersClick,
+  onAuthClick,
+  currentView
+}) => {
   const { theme, toggleTheme } = useTheme();
+  const { user, profile, signOut } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   // Reusable Nav Link Component with animated underline
   const NavLink = ({ label, onClick }: { label: string, onClick: () => void }) => (
@@ -82,6 +96,65 @@ export const Navbar: React.FC<NavbarProps & { currentView: string }> = ({ onHome
               )}
             </button>
           </div>
+
+          {/* User Menu or Auth Button */}
+          {user && profile ? (
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-brand-border hover:border-brand-accent transition-colors"
+              >
+                <User size={16} className="text-brand-accent" />
+                <span className="text-xs font-bold text-brand-white uppercase">{profile.full_name || 'User'}</span>
+              </button>
+
+              {showUserMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-lg">
+                  <div className="p-3 border-b border-brand-border">
+                    <p className="text-xs text-brand-secondary uppercase">Signed in as</p>
+                    <p className="text-sm text-brand-white font-bold truncate">{profile.email}</p>
+                    {profile.role === 'admin' && (
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-brand-accent text-black text-[10px] font-bold uppercase rounded">
+                        Admin
+                      </span>
+                    )}
+                  </div>
+                  {onOrdersClick && (
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        onOrdersClick();
+                      }}
+                      className="w-full px-4 py-3 flex items-center gap-2 text-brand-white hover:bg-brand-black/50 transition-colors text-xs font-bold uppercase"
+                    >
+                      <Package size={14} />
+                      My Orders
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      signOut();
+                    }}
+                    className="w-full px-4 py-3 flex items-center gap-2 text-red-400 hover:bg-brand-black/50 transition-colors text-xs font-bold uppercase"
+                  >
+                    <LogOut size={14} />
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            onAuthClick && (
+              <button
+                onClick={onAuthClick}
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-brand-accent text-brand-accent hover:bg-brand-accent hover:text-black transition-all text-xs font-bold uppercase tracking-wider"
+              >
+                <User size={16} />
+                <span>Sign In</span>
+              </button>
+            )
+          )}
 
           {/* CTA Button - Hidden on Builder Page */}
           {currentView !== 'builder' && (

@@ -1,11 +1,12 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, Layout, Database } from 'lucide-react';
+import { ArrowLeft, Layout, Database, ShoppingBag } from 'lucide-react';
 import { LibraryViewer } from './LibraryViewer';
 import { TemplateBuilder } from './TemplateBuilder';
+import { OrdersOverview } from './OrdersOverview';
 
 export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
-  const [tab, setTab] = useState<'library' | 'builder'>('library');
+  const [tab, setTab] = useState<'orders' | 'library' | 'builder'>('orders');
   const [builderInit, setBuilderInit] = useState<{front: string, back: string} | null>(null);
 
   const handleEdit = (front: string, back: string) => {
@@ -29,13 +30,19 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
         </div>
 
         <div className="flex gap-2 bg-black p-1 rounded-lg border border-neutral-800">
-            <button 
+            <button
+                onClick={() => setTab('orders')}
+                className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${tab === 'orders' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'}`}
+            >
+                <ShoppingBag size={14} /> Orders
+            </button>
+            <button
                 onClick={() => setTab('library')}
                 className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${tab === 'library' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'}`}
             >
                 <Database size={14} /> Library
             </button>
-            <button 
+            <button
                 onClick={() => setTab('builder')}
                 className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${tab === 'builder' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'}`}
             >
@@ -47,8 +54,9 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
       {/* Main Content */}
       <div className="flex-1 overflow-hidden p-6 bg-brand-black">
          <div className="h-full max-w-7xl mx-auto flex flex-col">
-            {tab === 'library' ? (
-                // Added wrapper with overflow-y-auto to enable scrolling for the library
+            {tab === 'orders' ? (
+                <OrdersOverview />
+            ) : tab === 'library' ? (
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
                     <LibraryViewer onEdit={handleEdit} />
                 </div>
