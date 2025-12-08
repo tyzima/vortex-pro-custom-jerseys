@@ -15,23 +15,37 @@ import {
   Layers,
   ChevronLeft,
   Save,
-  MoreVertical
+  MoreVertical,
+  Shirt,
+  Scissors,
+  Package
 } from 'lucide-react';
 import { useTemplateLibrary } from '../../contexts/TemplateLibraryContext';
-import { Template, Sport } from '../../types';
+import { Template, Sport, ProductCut } from '../../types';
 import { createTemplate } from '../../lib/templateService';
 
 type ViewMode = 'gallery' | 'list';
 type EditorMode = 'view' | 'edit' | null;
 type ViewSide = 'front' | 'back';
+type PageView = 'products' | 'templates';
 
 interface TemplateWithSport extends Template {
   sport: Sport;
   sportId: string;
 }
 
+interface SelectedProduct {
+  sportId: string;
+  sportLabel: string;
+  cutSlug: string;
+  cutLabel: string;
+  cut: ProductCut;
+}
+
 export const TemplateManager: React.FC = () => {
   const { library: SPORTS_LIBRARY, loading, refresh } = useTemplateLibrary();
+  const [pageView, setPageView] = useState<PageView>('products');
+  const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('gallery');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSport, setSelectedSport] = useState<string>('all');
@@ -66,6 +80,10 @@ export const TemplateManager: React.FC = () => {
   const filteredTemplates = useMemo(() => {
     let filtered = allTemplates;
 
+    if (selectedProduct) {
+      filtered = filtered.filter(t => t.sportId === selectedProduct.sportId);
+    }
+
     if (searchQuery) {
       filtered = filtered.filter(t =>
         t.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -73,7 +91,7 @@ export const TemplateManager: React.FC = () => {
       );
     }
 
-    if (selectedSport !== 'all') {
+    if (selectedSport !== 'all' && !selectedProduct) {
       filtered = filtered.filter(t => t.sportId === selectedSport);
     }
 
@@ -90,7 +108,7 @@ export const TemplateManager: React.FC = () => {
     });
 
     return filtered;
-  }, [allTemplates, searchQuery, selectedSport, sortBy]);
+  }, [allTemplates, searchQuery, selectedSport, sortBy, selectedProduct]);
 
   const openEditor = (template: TemplateWithSport, mode: 'view' | 'edit') => {
     setPendingTemplate({ template, mode });
@@ -134,6 +152,16 @@ export const TemplateManager: React.FC = () => {
     }
   };
 
+  const handleSelectProduct = (sportId: string, sportLabel: string, cutSlug: string, cutLabel: string, cut: ProductCut) => {
+    setSelectedProduct({ sportId, sportLabel, cutSlug, cutLabel, cut });
+    setPageView('templates');
+  };
+
+  const handleBackToProducts = () => {
+    setSelectedProduct(null);
+    setPageView('products');
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-neutral-950">
@@ -158,15 +186,44 @@ export const TemplateManager: React.FC = () => {
     );
   }
 
+  if (pageView === 'products') {
+    return (
+      <ProductGalleryView
+        SPORTS_LIBRARY={SPORTS_LIBRARY}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        selectedSport={selectedSport}
+        setSelectedSport={setSelectedSport}
+        onSelectProduct={handleSelectProduct}
+      />
+    );
+  }
+
   return (
     <div className="h-full bg-neutral-950 flex flex-col">
       {/* HEADER */}
       <div className="border-b border-neutral-800 bg-black">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold uppercase text-white">Design Templates</h1>
-              <p className="text-neutral-400 mt-1">Manage your jersey design library</p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleBackToProducts}
+                className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+                title="Back to Products"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-3xl font-bold uppercase text-white">Design Templates</h1>
+                  {selectedProduct && (
+                    <span className="px-3 py-1 bg-brand-accent/20 text-brand-accent text-sm font-bold uppercase rounded-full border border-brand-accent/30">
+                      {selectedProduct.sportLabel} • {selectedProduct.cutLabel}
+                    </span>
+                  )}
+                </div>
+                <p className="text-neutral-400">Browse templates for this product</p>
+              </div>
             </div>
             <button
               onClick={() => setShowNewTemplateModal(true)}
@@ -269,6 +326,7 @@ export const TemplateManager: React.FC = () => {
               <TemplateCard
                 key={`${template.sportId}-${template.id}`}
                 template={template}
+                selectedCutSlug={selectedProduct?.cutSlug}
                 onView={() => openEditor(template, 'view')}
                 onEdit={() => openEditor(template, 'edit')}
               />
@@ -280,6 +338,7 @@ export const TemplateManager: React.FC = () => {
               <TemplateListItem
                 key={`${template.sportId}-${template.id}`}
                 template={template}
+                selectedCutSlug={selectedProduct?.cutSlug}
                 onView={() => openEditor(template, 'view')}
                 onEdit={() => openEditor(template, 'edit')}
               />
@@ -402,12 +461,13 @@ export const TemplateManager: React.FC = () => {
 
 const TemplateCard: React.FC<{
   template: TemplateWithSport;
+  selectedCutSlug?: string;
   onView: () => void;
   onEdit: () => void;
-}> = ({ template, onView, onEdit }) => {
+}> = ({ template, selectedCutSlug, onView, onEdit }) => {
   const [showActions, setShowActions] = useState(false);
-  const defaultCut = Object.keys(template.sport.cuts)[0];
-  const cut = template.sport.cuts[defaultCut];
+  const cutSlug = selectedCutSlug || Object.keys(template.sport.cuts)[0];
+  const cut = template.sport.cuts[cutSlug];
 
   return (
     <div
@@ -495,10 +555,12 @@ const TemplateCard: React.FC<{
 
 const TemplateListItem: React.FC<{
   template: TemplateWithSport;
+  selectedCutSlug?: string;
   onView: () => void;
   onEdit: () => void;
-}> = ({ template, onView, onEdit }) => {
-  const cut = template.sport.cuts[Object.keys(template.sport.cuts)[0]];
+}> = ({ template, selectedCutSlug, onView, onEdit }) => {
+  const cutSlug = selectedCutSlug || Object.keys(template.sport.cuts)[0];
+  const cut = template.sport.cuts[cutSlug];
 
   return (
     <div className="bg-black border border-neutral-800 rounded-lg p-4 hover:border-brand-accent transition-colors flex items-center gap-4">
@@ -983,5 +1045,259 @@ const TemplateEditor: React.FC<{
         )}
       </div>
     </div>
+  );
+};
+
+const ProductGalleryView: React.FC<{
+  SPORTS_LIBRARY: Record<string, Sport> | null;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  selectedSport: string;
+  setSelectedSport: (sport: string) => void;
+  onSelectProduct: (sportId: string, sportLabel: string, cutSlug: string, cutLabel: string, cut: ProductCut) => void;
+}> = ({ SPORTS_LIBRARY, searchQuery, setSearchQuery, selectedSport, setSelectedSport, onSelectProduct }) => {
+
+  const allProducts = useMemo(() => {
+    if (!SPORTS_LIBRARY) return [];
+
+    const products: Array<{
+      sportId: string;
+      sportLabel: string;
+      cutSlug: string;
+      cutLabel: string;
+      cut: ProductCut;
+      templateCount: number;
+    }> = [];
+
+    Object.entries(SPORTS_LIBRARY).forEach(([sportId, sport]) => {
+      Object.entries(sport.cuts).forEach(([cutSlug, cut]) => {
+        products.push({
+          sportId,
+          sportLabel: sport.label,
+          cutSlug,
+          cutLabel: cut.label,
+          cut,
+          templateCount: sport.templates.length
+        });
+      });
+    });
+
+    return products;
+  }, [SPORTS_LIBRARY]);
+
+  const filteredProducts = useMemo(() => {
+    let filtered = allProducts;
+
+    if (searchQuery) {
+      filtered = filtered.filter(p =>
+        p.sportLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.cutLabel.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    if (selectedSport !== 'all') {
+      filtered = filtered.filter(p => p.sportId === selectedSport);
+    }
+
+    return filtered;
+  }, [allProducts, searchQuery, selectedSport]);
+
+  return (
+    <div className="h-full bg-neutral-950 flex flex-col">
+      {/* HEADER */}
+      <div className="border-b border-neutral-800 bg-black">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold uppercase text-white">Product Catalog</h1>
+              <p className="text-neutral-400 mt-1">Select a product to browse design templates</p>
+            </div>
+          </div>
+
+          {/* TOOLBAR */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Search */}
+            <div className="flex-1 min-w-[300px] relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:border-brand-accent outline-none transition-colors"
+              />
+            </div>
+
+            {/* Sport Filter */}
+            <select
+              value={selectedSport}
+              onChange={(e) => setSelectedSport(e.target.value)}
+              className="px-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:border-brand-accent outline-none cursor-pointer"
+            >
+              <option value="all">All Sports</option>
+              {SPORTS_LIBRARY && Object.entries(SPORTS_LIBRARY).map(([id, sport]) => (
+                <option key={id} value={id}>{sport.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Stats Bar */}
+        <div className="px-6 py-3 bg-neutral-900/50 border-t border-neutral-800 flex items-center gap-6 text-sm">
+          <span className="text-neutral-400">
+            <span className="text-white font-bold">{filteredProducts.length}</span> products
+          </span>
+          {selectedSport !== 'all' && SPORTS_LIBRARY && (
+            <span className="text-neutral-400">
+              in <span className="text-brand-accent font-bold">{SPORTS_LIBRARY[selectedSport]?.label}</span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* CONTENT */}
+      <div className="flex-1 overflow-auto p-6">
+        {filteredProducts.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <Package className="w-16 h-16 mx-auto mb-4 text-neutral-700" />
+              <h3 className="text-xl font-bold text-neutral-600 mb-2">No products found</h3>
+              <p className="text-neutral-500">Try adjusting your search or filters</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProducts.map(product => (
+              <ProductCard
+                key={`${product.sportId}-${product.cutSlug}`}
+                product={product}
+                onSelect={() => onSelectProduct(
+                  product.sportId,
+                  product.sportLabel,
+                  product.cutSlug,
+                  product.cutLabel,
+                  product.cut
+                )}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ProductCard: React.FC<{
+  product: {
+    sportId: string;
+    sportLabel: string;
+    cutSlug: string;
+    cutLabel: string;
+    cut: ProductCut;
+    templateCount: number;
+  };
+  onSelect: () => void;
+}> = ({ product, onSelect }) => {
+  const hasJersey = !!(product.cut.jersey.shape.front || product.cut.jersey.shape.back);
+  const hasShorts = !!(product.cut.shorts.shape.front || product.cut.shorts.shape.back);
+
+  return (
+    <button
+      onClick={onSelect}
+      className="group bg-black border border-neutral-800 rounded-xl overflow-hidden hover:border-brand-accent transition-all hover:shadow-lg hover:shadow-brand-accent/20 text-left w-full"
+    >
+      {/* Preview Grid */}
+      <div className="grid grid-cols-2 gap-2 p-4 bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
+        {/* Jersey */}
+        <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded-lg p-4 flex items-center justify-center">
+          {hasJersey ? (
+            <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-md">
+              <path
+                d={product.cut.jersey.shape.front}
+                fill="#2a2a2a"
+                stroke="#1a1a1a"
+                strokeWidth="2"
+              />
+              {product.cut.jersey.trim.front && (
+                <path
+                  d={product.cut.jersey.trim.front}
+                  fill="none"
+                  stroke="#D2F802"
+                  strokeWidth="3"
+                />
+              )}
+            </svg>
+          ) : (
+            <div className="text-center">
+              <Shirt size={32} className="mx-auto text-neutral-400 opacity-30" />
+            </div>
+          )}
+        </div>
+
+        {/* Shorts */}
+        <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded-lg p-4 flex items-center justify-center">
+          {hasShorts ? (
+            <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-md">
+              <path
+                d={product.cut.shorts.shape.front}
+                fill="#2a2a2a"
+                stroke="#1a1a1a"
+                strokeWidth="2"
+              />
+              {product.cut.shorts.trim.front && (
+                <path
+                  d={product.cut.shorts.trim.front}
+                  fill="none"
+                  stroke="#22c55e"
+                  strokeWidth="3"
+                />
+              )}
+            </svg>
+          ) : (
+            <div className="text-center">
+              <Scissors size={32} className="mx-auto text-neutral-400 opacity-30" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="p-4 border-t border-neutral-800">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-bold text-white text-lg uppercase">{product.cutLabel}</h3>
+            <p className="text-sm text-neutral-400">{product.sportLabel}</p>
+          </div>
+          <ChevronLeft size={20} className="text-neutral-600 group-hover:text-brand-accent transition-colors rotate-180" />
+        </div>
+
+        <div className="flex items-center gap-3 text-xs">
+          {hasJersey && (
+            <div className="flex items-center gap-1 text-brand-accent">
+              <Shirt size={12} />
+              <span>Jersey</span>
+            </div>
+          )}
+          {hasShorts && (
+            <div className="flex items-center gap-1 text-green-500">
+              <Scissors size={12} />
+              <span>Shorts</span>
+            </div>
+          )}
+          {!hasJersey && !hasShorts && (
+            <span className="text-red-500">No data</span>
+          )}
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-neutral-800 flex items-center justify-between text-xs">
+          <span className="text-neutral-500">
+            {product.templateCount} {product.templateCount === 1 ? 'template' : 'templates'}
+          </span>
+          <span className="text-brand-accent font-bold uppercase group-hover:underline">
+            Browse →
+          </span>
+        </div>
+      </div>
+    </button>
   );
 };
