@@ -24,7 +24,8 @@ import {
   FileUp,
   Edit3,
   HelpCircle,
-  Info
+  Info,
+  Box
 } from 'lucide-react';
 import type { ProductCut, DesignTemplate, DesignLayer, SportDefinition } from '../../types';
 import { Tooltip } from '../ui/Tooltip';
@@ -37,6 +38,7 @@ import {
   updateLayerPath,
   getProductDetails,
   updateProductDetails,
+  updateGarmentPath,
   type ProductDetails
 } from '../../lib/templateService';
 
@@ -91,7 +93,7 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
   const [zoom, setZoom] = useState(100);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [layerStates, setLayerStates] = useState<Record<string, LayerState>>({});
-  const [activePanel, setActivePanel] = useState<'layers' | 'colors'>('layers');
+  const [activePanel, setActivePanel] = useState<'layers' | 'colors' | 'shapes'>('layers');
   const [previewColors, setPreviewColors] = useState({
     primary: '#D2F802',
     secondary: '#0a0a0a',
@@ -123,6 +125,19 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
   const [loadingProductDetails, setLoadingProductDetails] = useState(false);
   const [savingProductDetails, setSavingProductDetails] = useState(false);
   const [newFeature, setNewFeature] = useState('');
+
+  const [showShapeUploadModal, setShowShapeUploadModal] = useState(false);
+  const [shapeUploadTarget, setShapeUploadTarget] = useState<{
+    pathType: 'shape' | 'trim';
+    side: 'front' | 'back';
+  } | null>(null);
+  const [localShapes, setLocalShapes] = useState<{
+    shape: { front: string; back: string };
+    trim: { front: string; back: string };
+  } | null>(null);
+  const [savingShapes, setSavingShapes] = useState(false);
+  const shapeFileInputRef = useRef<HTMLInputElement>(null);
+  const [shapeDragOver, setShapeDragOver] = useState(false);
 
   const currentCut = sport.cuts[selectedCutSlug];
   const currentTemplate = localTemplates[selectedTemplateIndex] || null;
@@ -161,6 +176,15 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
       });
     }
   }, [currentTemplate]);
+
+  useEffect(() => {
+    if (garment) {
+      setLocalShapes({
+        shape: { ...garment.shape },
+        trim: { ...garment.trim }
+      });
+    }
+  }, [selectedCutSlug, garmentType, garment]);
 
   const handleTemplateChange = (index: number) => {
     setSelectedTemplateIndex(index);
@@ -486,6 +510,109 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
       ...productDetails,
       features: productDetails.features.filter((_, i) => i !== index)
     });
+  };
+
+  const openShapeUploadModal = (pathType: 'shape' | 'trim', side: 'front' | 'back') => {
+    setShapeUploadTarget({ pathType, side });
+    setShowShapeUploadModal(true);
+  };
+
+  const handleShapeFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !shapeUploadTarget || !localShapes) return;
+
+    const file = files[0];
+    if (!file.name.endsWith('.svg')) {
+      setSaveError('Please upload an SVG file');
+      return;
+    }
+
+    try {
+      const content = await file.text();
+      const paths = extractPathsFromSVG(content);
+
+      if (paths.length === 0) {
+        setSaveError('No paths found in SVG file');
+        return;
+      }
+
+      const combinedPath = paths.join(' ');
+
+      setLocalShapes(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          [shapeUploadTarget.pathType]: {
+            ...prev[shapeUploadTarget.pathType],
+            [shapeUploadTarget.side]: combinedPath
+          }
+        };
+      });
+
+      setShowShapeUploadModal(false);
+      setShapeUploadTarget(null);
+      setIsDirty(true);
+    } catch (error) {
+      console.error('Failed to parse SVG:', error);
+      setSaveError('Failed to process SVG file');
+    }
+  };
+
+  const handleShapeDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setShapeDragOver(false);
+    handleShapeFileUpload(e.dataTransfer.files);
+  };
+
+  const handleSaveShapes = async () => {
+    if (!currentCut?.dbId || !localShapes) return;
+
+    setSavingShapes(true);
+    setSaveError(null);
+
+    try {
+      const updates = [
+        { pathType: 'shape' as const, side: 'front' as const, path: localShapes.shape.front },
+        { pathType: 'shape' as const, side: 'back' as const, path: localShapes.shape.back },
+        { pathType: 'trim' as const, side: 'front' as const, path: localShapes.trim.front },
+        { pathType: 'trim' as const, side: 'back' as const, path: localShapes.trim.back },
+      ];
+
+      for (const update of updates) {
+        if (update.path) {
+          await updateGarmentPath(
+            currentCut.dbId,
+            garmentType,
+            update.pathType,
+            update.side,
+            update.path
+          );
+        }
+      }
+
+      await refresh();
+      setIsDirty(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (error) {
+      console.error('Failed to save shapes:', error);
+      setSaveError('Failed to save shapes');
+    } finally {
+      setSavingShapes(false);
+    }
+  };
+
+  const clearShapePath = (pathType: 'shape' | 'trim', side: 'front' | 'back') => {
+    setLocalShapes(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [pathType]: {
+          ...prev[pathType],
+          [side]: ''
+        }
+      };
+    });
+    setIsDirty(true);
   };
 
   const renderGarmentCanvas = (side: 'front' | 'back') => {
@@ -838,6 +965,14 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
               >
                 <Palette size={14} /> Colors
               </button>
+              <button
+                onClick={() => setActivePanel('shapes')}
+                className={`flex-1 px-4 py-3 text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${
+                  activePanel === 'shapes' ? 'text-brand-accent border-b-2 border-brand-accent' : 'text-neutral-500 hover:text-white'
+                }`}
+              >
+                <Box size={14} /> Shapes
+              </button>
             </div>
           </div>
 
@@ -1089,6 +1224,182 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
                         title={color}
                       />
                     ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'shapes' && localShapes && (
+              <div className="p-4 space-y-4">
+                <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-bold uppercase text-neutral-400">
+                      {garmentType === 'jersey' ? 'Jersey' : 'Shorts'} Shape
+                    </h4>
+                    <Tooltip content="The base garment outline" position="left">
+                      <HelpCircle size={12} className="text-neutral-600 hover:text-neutral-400 cursor-help" />
+                    </Tooltip>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-[10px] text-neutral-500 uppercase">Front Shape</label>
+                        {localShapes.shape.front && (
+                          <button
+                            onClick={() => clearShapePath('shape', 'front')}
+                            className="text-[10px] text-red-500 hover:text-red-400"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="w-16 h-20 bg-neutral-800 border border-neutral-700 rounded flex items-center justify-center overflow-hidden">
+                          {localShapes.shape.front ? (
+                            <svg viewBox="0 0 400 500" className="w-full h-full p-1">
+                              <path d={localShapes.shape.front} fill="#505050" />
+                            </svg>
+                          ) : (
+                            <span className="text-[9px] text-neutral-600">None</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => openShapeUploadModal('shape', 'front')}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded text-xs transition-colors"
+                        >
+                          <Upload size={12} />
+                          {localShapes.shape.front ? 'Replace' : 'Upload'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-[10px] text-neutral-500 uppercase">Back Shape</label>
+                        {localShapes.shape.back && (
+                          <button
+                            onClick={() => clearShapePath('shape', 'back')}
+                            className="text-[10px] text-red-500 hover:text-red-400"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="w-16 h-20 bg-neutral-800 border border-neutral-700 rounded flex items-center justify-center overflow-hidden">
+                          {localShapes.shape.back ? (
+                            <svg viewBox="0 0 400 500" className="w-full h-full p-1">
+                              <path d={localShapes.shape.back} fill="#505050" />
+                            </svg>
+                          ) : (
+                            <span className="text-[9px] text-neutral-600">None</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => openShapeUploadModal('shape', 'back')}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded text-xs transition-colors"
+                        >
+                          <Upload size={12} />
+                          {localShapes.shape.back ? 'Replace' : 'Upload'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-bold uppercase text-neutral-400">Trim Lines</h4>
+                    <Tooltip content="Accent lines on the garment" position="left">
+                      <HelpCircle size={12} className="text-neutral-600 hover:text-neutral-400 cursor-help" />
+                    </Tooltip>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-[10px] text-neutral-500 uppercase">Front Trim</label>
+                        {localShapes.trim.front && (
+                          <button
+                            onClick={() => clearShapePath('trim', 'front')}
+                            className="text-[10px] text-red-500 hover:text-red-400"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="w-16 h-20 bg-neutral-800 border border-neutral-700 rounded flex items-center justify-center overflow-hidden">
+                          {localShapes.trim.front ? (
+                            <svg viewBox="0 0 400 500" className="w-full h-full p-1">
+                              <path d={localShapes.trim.front} fill="none" stroke="#D2F802" strokeWidth="4" />
+                            </svg>
+                          ) : (
+                            <span className="text-[9px] text-neutral-600">None</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => openShapeUploadModal('trim', 'front')}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded text-xs transition-colors"
+                        >
+                          <Upload size={12} />
+                          {localShapes.trim.front ? 'Replace' : 'Upload'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-[10px] text-neutral-500 uppercase">Back Trim</label>
+                        {localShapes.trim.back && (
+                          <button
+                            onClick={() => clearShapePath('trim', 'back')}
+                            className="text-[10px] text-red-500 hover:text-red-400"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="w-16 h-20 bg-neutral-800 border border-neutral-700 rounded flex items-center justify-center overflow-hidden">
+                          {localShapes.trim.back ? (
+                            <svg viewBox="0 0 400 500" className="w-full h-full p-1">
+                              <path d={localShapes.trim.back} fill="none" stroke="#D2F802" strokeWidth="4" />
+                            </svg>
+                          ) : (
+                            <span className="text-[9px] text-neutral-600">None</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => openShapeUploadModal('trim', 'back')}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded text-xs transition-colors"
+                        >
+                          <Upload size={12} />
+                          {localShapes.trim.back ? 'Replace' : 'Upload'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSaveShapes}
+                  disabled={savingShapes || !currentCut?.dbId}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-brand-accent text-black font-bold uppercase text-xs rounded-lg hover:bg-brand-accent/90 transition-colors disabled:opacity-50"
+                >
+                  {savingShapes ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {savingShapes ? 'Saving...' : 'Save Shape Changes'}
+                </button>
+
+                <div className="p-3 bg-neutral-800/50 border border-neutral-700 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Info size={14} className="text-brand-accent mt-0.5 flex-shrink-0" />
+                    <div className="text-[10px] text-neutral-500">
+                      <p className="font-semibold text-neutral-400 mb-1">SVG Requirements</p>
+                      <p>Viewbox: <span className="text-neutral-300 font-mono">0 0 400 500</span></p>
+                      <p>Use filled paths for shapes, stroked for trims</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1447,6 +1758,74 @@ export const ProductDesignCanvas: React.FC<ProductDesignCanvasProps> = ({
           )}
         </div>
       </div>
+
+      {showShapeUploadModal && shapeUploadTarget && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-lg w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-bold uppercase">
+                  Upload {shapeUploadTarget.pathType === 'shape' ? 'Shape' : 'Trim'} SVG
+                </h3>
+                <p className="text-sm text-neutral-400 mt-1">
+                  {shapeUploadTarget.side} view for {garmentType}
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowShapeUploadModal(false); setShapeUploadTarget(null); }}
+                className="text-neutral-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+                shapeDragOver
+                  ? 'border-brand-accent bg-brand-accent/10'
+                  : 'border-neutral-700 hover:border-neutral-600'
+              }`}
+              onDragOver={(e) => { e.preventDefault(); setShapeDragOver(true); }}
+              onDragLeave={() => setShapeDragOver(false)}
+              onDrop={handleShapeDrop}
+            >
+              <FileUp size={48} className="mx-auto text-neutral-600 mb-4" />
+              <p className="text-neutral-400 mb-2">
+                Drag and drop your SVG file here
+              </p>
+              <p className="text-neutral-600 text-sm mb-4">or</p>
+              <input
+                ref={shapeFileInputRef}
+                type="file"
+                accept=".svg"
+                onChange={(e) => handleShapeFileUpload(e.target.files)}
+                className="hidden"
+              />
+              <button
+                onClick={() => shapeFileInputRef.current?.click()}
+                className="px-6 py-2 bg-brand-accent text-black font-bold uppercase text-sm rounded-lg hover:bg-brand-accent/90 transition-colors"
+              >
+                Browse Files
+              </button>
+            </div>
+
+            <div className="mt-4 p-3 bg-neutral-800/50 border border-neutral-700 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Info size={16} className="text-brand-accent mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-neutral-400">
+                  <p className="font-semibold text-neutral-300 mb-1">SVG Requirements</p>
+                  <ul className="space-y-1 list-disc list-inside text-neutral-500">
+                    <li>Viewbox: <span className="text-neutral-300 font-mono">0 0 400 500</span> (400x500)</li>
+                    <li>Use only <span className="text-neutral-300 font-mono">&lt;path&gt;</span> elements</li>
+                    <li>{shapeUploadTarget.pathType === 'shape' ? 'Paths should be filled' : 'Use stroked paths for trim lines'}</li>
+                    <li>Export from Illustrator/Figma at this exact size</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
