@@ -18,8 +18,8 @@ export const LibraryViewer: React.FC<LibraryViewerProps> = ({ onEdit }) => {
     };
 
     const editCut = (cut: any) => {
-        const front = createSvgString([cut.shape.front, cut.trim.front]);
-        const back = createSvgString([cut.shape.back, cut.trim.back]);
+        const front = createSvgString([cut.jersey.shape.front, cut.jersey.trim.front]);
+        const back = createSvgString([cut.jersey.shape.back, cut.jersey.trim.back]);
         onEdit(front, back);
     };
 
@@ -29,8 +29,8 @@ export const LibraryViewer: React.FC<LibraryViewerProps> = ({ onEdit }) => {
         const baseCut = sport.cuts[cutId] || Object.values(sport.cuts)[0];
 
         // Combine Base Cut paths + Template Layer paths
-        const frontPaths = [baseCut.shape.front, baseCut.trim.front, ...template.layers.map((l: any) => l.paths.front)];
-        const backPaths = [baseCut.shape.back, baseCut.trim.back, ...template.layers.map((l: any) => l.paths.back)];
+        const frontPaths = [baseCut.jersey.shape.front, baseCut.jersey.trim.front, ...template.layers.map((l: any) => l.paths.jersey.front)];
+        const backPaths = [baseCut.jersey.shape.back, baseCut.jersey.trim.back, ...template.layers.map((l: any) => l.paths.jersey.back)];
 
         const front = createSvgString(frontPaths);
         const back = createSvgString(backPaths);
@@ -67,8 +67,8 @@ export const LibraryViewer: React.FC<LibraryViewerProps> = ({ onEdit }) => {
                                         </div>
                                         <div className="aspect-[3/4] bg-neutral-900 rounded flex items-center justify-center p-2 relative overflow-hidden">
                                             <svg viewBox="0 0 400 500" className="w-full h-full opacity-80 group-hover:opacity-100 transition-opacity">
-                                                <path d={cut.shape.front} fill="#333" />
-                                                <path d={cut.trim.front} fill="#555" />
+                                                <path d={cut.jersey.shape.front} fill="#333" />
+                                                <path d={cut.jersey.trim.front} fill="#555" />
                                             </svg>
                                         </div>
                                     </div>

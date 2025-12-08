@@ -128,7 +128,7 @@ export const Navbar: React.FC<NavbarProps & { currentView: string }> = ({
                       className="w-full px-4 py-3 flex items-center gap-2 text-brand-white hover:bg-brand-black/50 transition-colors text-xs font-bold uppercase"
                     >
                       <Package size={14} />
-                      My Orders
+                      {profile?.role === 'admin' ? 'Admin Dashboard' : 'My Orders'}
                     </button>
                   )}
                   <button

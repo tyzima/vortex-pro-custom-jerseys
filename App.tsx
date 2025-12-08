@@ -115,6 +115,8 @@ const AppContent = () => {
   const handleOrdersClick = () => {
     if (!user) {
       setView('auth');
+    } else if (profile?.role === 'admin') {
+      setView('admin');
     } else {
       setView('orders');
     }
