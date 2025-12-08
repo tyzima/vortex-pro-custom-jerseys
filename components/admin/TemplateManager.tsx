@@ -43,6 +43,8 @@ export const TemplateManager: React.FC = () => {
   const [showNewTemplateModal, setShowNewTemplateModal] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateSport, setNewTemplateSport] = useState('');
+  const [showCutSelectionModal, setShowCutSelectionModal] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState<{ template: TemplateWithSport; mode: 'view' | 'edit' } | null>(null);
 
   const allTemplates: TemplateWithSport[] = useMemo(() => {
     if (!SPORTS_LIBRARY) return [];
@@ -91,14 +93,27 @@ export const TemplateManager: React.FC = () => {
   }, [allTemplates, searchQuery, selectedSport, sortBy]);
 
   const openEditor = (template: TemplateWithSport, mode: 'view' | 'edit') => {
-    setActiveTemplate(template);
-    setEditorMode(mode);
-    setSelectedCut(Object.keys(template.sport.cuts)[0] || '');
+    setPendingTemplate({ template, mode });
+    setShowCutSelectionModal(true);
+  };
+
+  const openEditorWithCut = (cut: string) => {
+    if (!pendingTemplate) return;
+    setActiveTemplate(pendingTemplate.template);
+    setEditorMode(pendingTemplate.mode);
+    setSelectedCut(cut);
+    setShowCutSelectionModal(false);
+    setPendingTemplate(null);
   };
 
   const closeEditor = () => {
     setEditorMode(null);
     setActiveTemplate(null);
+  };
+
+  const closeCutSelectionModal = () => {
+    setShowCutSelectionModal(false);
+    setPendingTemplate(null);
   };
 
   const handleCreateTemplate = async () => {
@@ -337,6 +352,50 @@ export const TemplateManager: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* CUT SELECTION MODAL */}
+      {showCutSelectionModal && pendingTemplate && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-bold uppercase">Select Garment Type</h3>
+                <p className="text-sm text-neutral-400 mt-1">Choose which garment to edit</p>
+              </div>
+              <button
+                onClick={closeCutSelectionModal}
+                className="text-neutral-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(pendingTemplate.template.sport.cuts).map(([cutSlug, cutData]) => (
+                <button
+                  key={cutSlug}
+                  onClick={() => openEditorWithCut(cutSlug)}
+                  className="group relative bg-black border-2 border-neutral-800 rounded-xl p-4 hover:border-brand-accent transition-all hover:scale-105"
+                >
+                  <div className="text-center mb-3">
+                    <h4 className="font-bold text-white text-lg uppercase">{cutData.label}</h4>
+                  </div>
+                  <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded-lg overflow-hidden p-4">
+                    <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-md">
+                      <path
+                        d={cutData.jersey.shape.front}
+                        fill="#2a2a2a"
+                        stroke="#1a1a1a"
+                        strokeWidth="2"
+                      />
+                    </svg>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -559,6 +618,23 @@ const TemplateEditor: React.FC<{
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Garment Type Switcher */}
+            <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1">
+              {Object.entries(template.sport.cuts).map(([cutSlug, cutData]) => (
+                <button
+                  key={cutSlug}
+                  onClick={() => setSelectedCut(cutSlug)}
+                  className={`px-4 py-2 rounded text-sm font-bold uppercase transition-colors ${
+                    selectedCut === cutSlug
+                      ? 'bg-brand-accent text-black'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  {cutData.label}
+                </button>
+              ))}
+            </div>
+
             {/* View Toggle */}
             <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1">
               <button
@@ -595,35 +671,28 @@ const TemplateEditor: React.FC<{
 
       {/* Editor Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Cut Selector */}
+        {/* Left Sidebar - Current Cut Info */}
         <div className="w-64 bg-black border-r border-neutral-800 flex flex-col">
           <div className="p-4 border-b border-neutral-800">
-            <h3 className="font-bold uppercase text-sm text-neutral-400">Step 1: Select Cut</h3>
+            <h3 className="font-bold uppercase text-sm text-neutral-400 mb-1">Current Garment</h3>
+            <div className="text-white text-lg font-bold">{cut?.label}</div>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {Object.entries(template.sport.cuts).map(([cutSlug, cutData]) => (
-              <button
-                key={cutSlug}
-                onClick={() => setSelectedCut(cutSlug)}
-                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                  selectedCut === cutSlug
-                    ? 'border-brand-accent bg-brand-accent/10'
-                    : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700'
-                }`}
-              >
-                <div className="font-bold text-white text-sm mb-2">{cutData.label}</div>
-                <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded overflow-hidden p-3">
-                  <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-md">
-                    <path
-                      d={cutData.jersey.shape.front}
-                      fill="#2a2a2a"
-                      stroke="#1a1a1a"
-                      strokeWidth="2"
-                    />
-                  </svg>
-                </div>
-              </button>
-            ))}
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="bg-neutral-900 rounded-lg p-3 border border-neutral-800">
+              <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded overflow-hidden p-4 mb-2">
+                <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-md">
+                  <path
+                    d={cut?.jersey.shape.front}
+                    fill="#2a2a2a"
+                    stroke="#1a1a1a"
+                    strokeWidth="2"
+                  />
+                </svg>
+              </div>
+              <div className="text-xs text-neutral-400 text-center">
+                Use the switcher above to change garment type
+              </div>
+            </div>
           </div>
         </div>
 
@@ -631,7 +700,7 @@ const TemplateEditor: React.FC<{
         <div className="flex-1 flex flex-col bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
           <div className="p-4 border-b border-neutral-700/50 bg-black/20">
             <h3 className="font-bold uppercase text-sm text-neutral-300 text-center">
-              Customer Preview - Step 2: Template Design
+              Template Design Preview
             </h3>
           </div>
 
