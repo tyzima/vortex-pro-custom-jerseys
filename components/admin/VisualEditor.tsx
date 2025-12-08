@@ -54,8 +54,14 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ templateId }) => {
   }, [templateId, SPORTS_LIBRARY, loading]);
 
   const loadTemplateById = (id: string) => {
+    if (!SPORTS_LIBRARY) return;
+
     for (const [sportId, sportData] of Object.entries(SPORTS_LIBRARY)) {
+      if (!sportData?.cuts) continue;
+
       for (const [cutSlug, cutData] of Object.entries(sportData.cuts)) {
+        if (!cutData?.templates || !Array.isArray(cutData.templates)) continue;
+
         const template = cutData.templates.find((t: Template) => t.id === id);
         if (template) {
           setExpandedSports(new Set([sportId]));
