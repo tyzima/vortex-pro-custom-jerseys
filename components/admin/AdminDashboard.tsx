@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Layout, Database, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Layout, Database, ShoppingBag, Palette } from 'lucide-react';
 import { LibraryViewer, EditContext } from './LibraryViewer';
 import { TemplateBuilder } from './TemplateBuilder';
 import { OrdersOverview } from './OrdersOverview';
+import { VisualEditor } from './VisualEditor';
 
 export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
-  const [tab, setTab] = useState<'orders' | 'library' | 'builder'>('orders');
+  const [tab, setTab] = useState<'orders' | 'library' | 'builder' | 'visual'>('visual');
   const [editContext, setEditContext] = useState<EditContext | null>(null);
 
   const handleEdit = (context: EditContext) => {
@@ -44,12 +45,20 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
             <ShoppingBag size={14} /> Orders
           </button>
           <button
+            onClick={() => setTab('visual')}
+            className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${
+              tab === 'visual' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <Palette size={14} /> Visual Editor
+          </button>
+          <button
             onClick={() => setTab('library')}
             className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${
               tab === 'library' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <Database size={14} /> Library
+            <Database size={14} /> Library View
           </button>
           <button
             onClick={() => {
@@ -60,23 +69,29 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
               tab === 'builder' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <Layout size={14} /> Builder Tool
+            <Layout size={14} /> Legacy Builder
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden p-6" style={{ backgroundColor: '#0a0a0a' }}>
-        <div className="h-full max-w-7xl mx-auto flex flex-col">
-          {tab === 'orders' ? (
+      <div className="flex-1 overflow-hidden" style={{ backgroundColor: '#0a0a0a' }}>
+        {tab === 'orders' ? (
+          <div className="h-full max-w-7xl mx-auto flex flex-col p-6">
             <OrdersOverview />
-          ) : tab === 'library' ? (
+          </div>
+        ) : tab === 'visual' ? (
+          <VisualEditor />
+        ) : tab === 'library' ? (
+          <div className="h-full max-w-7xl mx-auto flex flex-col p-6">
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
               <LibraryViewer onEdit={handleEdit} />
             </div>
-          ) : (
+          </div>
+        ) : (
+          <div className="h-full max-w-7xl mx-auto flex flex-col p-6">
             <TemplateBuilder editContext={editContext} onExit={handleBuilderExit} />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
