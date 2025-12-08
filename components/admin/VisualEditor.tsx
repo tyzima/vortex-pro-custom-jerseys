@@ -361,7 +361,8 @@ export const VisualEditor: React.FC = () => {
                     {selectedContext.template?.layers.map((layer, i) => {
                       const path = layer.paths.jersey[viewSide];
                       const colors = ['#D2F802', '#60a5fa', '#f97316', '#22c55e', '#db2777', '#a78bfa'];
-                      return path?.map((p, j) => (
+                      if (!Array.isArray(path)) return null;
+                      return path.map((p, j) => (
                         <path
                           key={`${layer.id}-${j}`}
                           d={p}
@@ -418,7 +419,8 @@ export const VisualEditor: React.FC = () => {
                     {selectedContext.template?.layers.map((layer, i) => {
                       const path = layer.paths.shorts[viewSide];
                       const colors = ['#22c55e', '#60a5fa', '#f97316', '#D2F802', '#db2777', '#a78bfa'];
-                      return path?.map((p, j) => (
+                      if (!Array.isArray(path)) return null;
+                      return path.map((p, j) => (
                         <path
                           key={`${layer.id}-${j}`}
                           d={p}
