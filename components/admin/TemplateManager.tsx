@@ -416,20 +416,19 @@ const TemplateCard: React.FC<{
       onMouseLeave={() => setShowActions(false)}
     >
       {/* Preview */}
-      <div className="aspect-square bg-gradient-to-br from-neutral-900 to-black p-8 relative">
-        <svg viewBox="0 0 400 500" className="w-full h-full">
-          {/* Base Shape */}
+      <div className="aspect-square bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 p-8 relative">
+        <svg viewBox="0 0 400 500" className="w-full h-full drop-shadow-lg">
+          {/* Base Jersey Shape */}
           {cut?.jersey.shape.front && (
             <path
               d={cut.jersey.shape.front}
-              fill="#0a0a0a"
-              stroke="#222"
-              strokeWidth="1"
-              opacity="0.4"
+              fill="#1a1a1a"
+              stroke="#0a0a0a"
+              strokeWidth="2"
             />
           )}
 
-          {/* Template Layers */}
+          {/* Template Design Layers */}
           {template.layers.map((layer, i) => {
             const colors = ['#D2F802', '#60a5fa', '#f97316', '#22c55e', '#db2777', '#a78bfa'];
             return layer.paths.jersey.front.map((path, j) => (
@@ -437,12 +436,20 @@ const TemplateCard: React.FC<{
                 key={`${layer.id}-${j}`}
                 d={path}
                 fill={colors[i % colors.length]}
-                stroke="#fff"
-                strokeWidth="1"
-                opacity="0.85"
+                stroke="none"
               />
             ));
           })}
+
+          {/* Jersey Trim */}
+          {cut?.jersey.trim.front && (
+            <path
+              d={cut.jersey.trim.front}
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="3"
+            />
+          )}
         </svg>
 
         {/* Quick Actions Overlay */}
@@ -491,18 +498,32 @@ const TemplateListItem: React.FC<{
   onView: () => void;
   onEdit: () => void;
 }> = ({ template, onView, onEdit }) => {
+  const cut = template.sport.cuts[Object.keys(template.sport.cuts)[0]];
+
   return (
     <div className="bg-black border border-neutral-800 rounded-lg p-4 hover:border-brand-accent transition-colors flex items-center gap-4">
       {/* Mini Preview */}
-      <div className="w-16 h-16 bg-neutral-900 rounded flex-shrink-0">
-        <svg viewBox="0 0 400 500" className="w-full h-full p-2">
-          {template.layers.length > 0 && template.layers[0].paths.jersey.front[0] && (
+      <div className="w-20 h-20 bg-gradient-to-br from-neutral-200 via-neutral-100 to-neutral-300 rounded flex-shrink-0 p-2">
+        <svg viewBox="0 0 400 500" className="w-full h-full">
+          {/* Base Jersey Shape */}
+          {cut?.jersey.shape.front && (
             <path
-              d={template.layers[0].paths.jersey.front[0]}
-              fill="#D2F802"
-              opacity="0.8"
+              d={cut.jersey.shape.front}
+              fill="#1a1a1a"
+              stroke="#0a0a0a"
+              strokeWidth="2"
             />
           )}
+
+          {/* First Design Layer */}
+          {template.layers.length > 0 && template.layers[0].paths.jersey.front.map((path, i) => (
+            <path
+              key={i}
+              d={path}
+              fill="#D2F802"
+              stroke="none"
+            />
+          ))}
         </svg>
       </div>
 
