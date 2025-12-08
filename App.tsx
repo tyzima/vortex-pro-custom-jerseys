@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Customizer } from './components/Customizer';
-import { TemplateGallery } from './components/TemplateGallery';
 import { Features } from './components/Features';
 import { TrustBar } from './components/TrustBar';
 import { Testimonials } from './components/Testimonials';
@@ -28,8 +27,6 @@ const AppContent = () => {
   const [view, setView] = useState<'home' | 'builder' | 'admin' | 'checkout' | 'auth' | 'orders'>('home');
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<{ sport: string; cut: string; template: string } | null>(null);
-  const [showGallery, setShowGallery] = useState(true);
 
   // Initialize Cart from LocalStorage
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -134,23 +131,6 @@ const AppContent = () => {
     }
   };
 
-  const handleTemplateSelect = (sport: string, cut: string, template: string) => {
-    setSelectedTemplate({ sport, cut, template });
-    setShowGallery(false);
-  };
-
-  const handleBackToGallery = () => {
-    setShowGallery(true);
-    setSelectedTemplate(null);
-  };
-
-  const handleDesignClick = () => {
-    setShowGallery(true);
-    setSelectedTemplate(null);
-    setEditingItemId(null);
-    setView('builder');
-  };
-
   if (loading) {
     return (
       <div className="fixed inset-0 bg-brand-black flex items-center justify-center">
@@ -166,7 +146,7 @@ const AppContent = () => {
       <Navbar
         onHomeClick={() => setView('home')}
         onMenuClick={(menu) => setActiveOverlay(menu)}
-        onDesignClick={handleDesignClick}
+        onDesignClick={() => setView('builder')}
         cartCount={cart.length}
         onCartClick={handleCheckoutClick}
         onOrdersClick={handleOrdersClick}
@@ -246,22 +226,16 @@ const AppContent = () => {
         {/* VIEW: BUILDER */}
         {view === 'builder' && (
           <div className="absolute inset-0 w-full h-full bg-brand-black z-10">
-            {showGallery ? (
-              <TemplateGallery
-                onSelectTemplate={handleTemplateSelect}
-                onBack={() => setView('home')}
-              />
-            ) : (
-              <Customizer
-                onAddToCart={handleAddToCart}
-                onUpdateCartItem={handleUpdateCartItem}
-                editingItemId={editingItemId}
-                editingItem={editingItemId ? cart.find(item => item.id === editingItemId) : undefined}
-                onCheckout={() => setView('checkout')}
-                initialTemplate={selectedTemplate}
-                onBackToGallery={handleBackToGallery}
-              />
-            )}
+            {/* Back Button Overlay */}
+
+
+            <Customizer
+              onAddToCart={handleAddToCart}
+              onUpdateCartItem={handleUpdateCartItem}
+              editingItemId={editingItemId}
+              editingItem={editingItemId ? cart.find(item => item.id === editingItemId) : undefined}
+              onCheckout={() => setView('checkout')}
+            />
           </div>
         )}
       </div>
