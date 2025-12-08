@@ -3,119 +3,10 @@ import { ArrowLeft, Layout, Database, ShoppingBag, Palette } from 'lucide-react'
 import { LibraryViewer, EditContext } from './LibraryViewer';
 import { TemplateBuilder } from './TemplateBuilder';
 import { OrdersOverview } from './OrdersOverview';
-import { VisualEditor } from './VisualEditor';
-import HierarchicalNav from './HierarchicalNav';
-import TemplateGrid from './TemplateGrid';
-import CreateTemplateModal from './CreateTemplateModal';
-import { supabase } from '../../lib/supabase';
-
-interface NavItem {
-  sportId: string;
-  sportLabel: string;
-}
-
-interface Sport {
-  id: string;
-  label: string;
-  templateCount?: number;
-}
-
-interface Template {
-  id: string;
-  slug: string;
-  label: string;
-  displayOrder: number;
-  isPublished: boolean;
-  layerCount: number;
-}
-
+import { TemplateManager } from './TemplateManager';
 export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
-  const [tab, setTab] = useState<'orders' | 'library' | 'builder' | 'templates' | 'visual'>('templates');
+  const [tab, setTab] = useState<'orders' | 'library' | 'builder' | 'templates'>('templates');
   const [editContext, setEditContext] = useState<EditContext | null>(null);
-  const [sports, setSports] = useState<Sport[]>([]);
-  const [selectedNav, setSelectedNav] = useState<NavItem | null>(null);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  useEffect(() => {
-    loadSports();
-  }, []);
-
-  useEffect(() => {
-    if (selectedNav) {
-      loadTemplates(selectedNav.sportId);
-    }
-  }, [selectedNav]);
-
-  const loadSports = async () => {
-    try {
-      setLoading(true);
-      const { data: sportsData, error: sportsError } = await supabase
-        .from('sports')
-        .select('id, label, display_order')
-        .eq('is_active', true)
-        .order('display_order');
-
-      if (sportsError) throw sportsError;
-
-      const sportsWithTemplateCount = await Promise.all(
-        (sportsData || []).map(async (sport) => {
-          const { count } = await supabase
-            .from('sport_templates')
-            .select('*', { count: 'exact', head: true })
-            .eq('sport_id', sport.id);
-
-          return {
-            id: sport.id,
-            label: sport.label,
-            templateCount: count || 0
-          };
-        })
-      );
-
-      setSports(sportsWithTemplateCount);
-    } catch (error) {
-      console.error('Error loading sports:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadTemplates = async (sportId: string) => {
-    try {
-      const { data: templatesData, error } = await supabase
-        .from('sport_templates')
-        .select(`
-          id,
-          slug,
-          label,
-          display_order,
-          is_published,
-          template_layers (
-            id
-          )
-        `)
-        .eq('sport_id', sportId)
-        .order('display_order');
-
-      if (error) throw error;
-
-      const formattedTemplates: Template[] = (templatesData || []).map((t: any) => ({
-        id: t.id,
-        slug: t.slug,
-        label: t.label,
-        displayOrder: t.display_order,
-        isPublished: t.is_published,
-        layerCount: t.template_layers?.length || 0
-      }));
-
-      setTemplates(formattedTemplates);
-    } catch (error) {
-      console.error('Error loading templates:', error);
-    }
-  };
 
   const handleEdit = (context: EditContext) => {
     setEditContext(context);
@@ -125,58 +16,6 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
   const handleBuilderExit = () => {
     setEditContext(null);
     setTab('library');
-  };
-
-  const handleNavSelect = (item: NavItem) => {
-    setSelectedNav(item);
-    setEditingTemplateId(null);
-  };
-
-  const handleEditTemplate = (templateId: string) => {
-    setEditingTemplateId(templateId);
-  };
-
-  const handleBackToGrid = () => {
-    setEditingTemplateId(null);
-    if (selectedNav) {
-      loadTemplates(selectedNav.sportId);
-    }
-  };
-
-  const handleCreateTemplate = () => {
-    setShowCreateModal(true);
-  };
-
-  const handleSubmitNewTemplate = async (slug: string, label: string) => {
-    if (!selectedNav) return;
-
-    try {
-      const nextDisplayOrder = templates.length > 0
-        ? Math.max(...templates.map(t => t.displayOrder)) + 1
-        : 1;
-
-      const { data, error } = await supabase
-        .from('sport_templates')
-        .insert({
-          sport_id: selectedNav.sportId,
-          slug,
-          label,
-          display_order: nextDisplayOrder,
-          is_published: false
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      await loadTemplates(selectedNav.sportId);
-
-      if (data) {
-        setEditingTemplateId(data.id);
-      }
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to create template');
-    }
   };
 
   return (
@@ -232,45 +71,7 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
             <OrdersOverview />
           </div>
         ) : tab === 'templates' ? (
-          editingTemplateId ? (
-            <div className="h-full flex flex-col">
-              <div className="px-6 py-4 border-b border-neutral-800">
-                <button
-                  onClick={handleBackToGrid}
-                  className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest"
-                >
-                  <ArrowLeft size={16} /> Back to Templates
-                </button>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <VisualEditor templateId={editingTemplateId} />
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex">
-              <HierarchicalNav
-                sports={sports}
-                selectedItem={selectedNav}
-                onSelect={handleNavSelect}
-              />
-              {selectedNav ? (
-                <TemplateGrid
-                  sportLabel={selectedNav.sportLabel}
-                  templates={templates}
-                  onEditTemplate={handleEditTemplate}
-                  onCreateTemplate={handleCreateTemplate}
-                />
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-neutral-500">
-                  <div className="text-center">
-                    <Palette className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium">Select a sport to view templates</p>
-                    <p className="text-sm mt-2">Choose a sport from the left sidebar</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )
+          <TemplateManager />
         ) : tab === 'library' ? (
           <div className="h-full max-w-7xl mx-auto flex flex-col p-6">
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
@@ -283,15 +84,6 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
           </div>
         )}
       </div>
-
-      {showCreateModal && selectedNav && (
-        <CreateTemplateModal
-          sportId={selectedNav.sportId}
-          sportLabel={selectedNav.sportLabel}
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={handleSubmitNewTemplate}
-        />
-      )}
     </div>
   );
 };
