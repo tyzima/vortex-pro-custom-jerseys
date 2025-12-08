@@ -44,10 +44,7 @@ export const AdminDashboard = ({ onExit }: { onExit: () => void }) => {
             <ShoppingBag size={14} /> Orders
           </button>
           <button
-            onClick={() => {
-              setEditingTemplateId(null);
-              setTab('templates');
-            }}
+            onClick={() => setTab('templates')}
             className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${
               tab === 'templates' ? 'bg-brand-accent text-black shadow-lg' : 'text-neutral-400 hover:text-white'
             }`}
