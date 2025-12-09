@@ -1912,11 +1912,32 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                             </div>
                                         </Tooltip>
 
-                                        {/* Pattern Color Trigger (only if pattern is not none) */}
+                                        {/* Pattern Mode Toggle (only if pattern is not none) */}
                                         {design.zones[selectedItemId]?.pattern && design.zones[selectedItemId]?.pattern !== 'none' && (
+                                            <div className="flex items-center border-l border-brand-border pl-3">
+                                                <Tooltip content="Ghosted Pattern" position="bottom">
+                                                    <button
+                                                        onClick={() => updateZone(selectedItemId, { patternMode: 'ghost' })}
+                                                        className={`p-1.5 rounded transition-all ${design.zones[selectedItemId]?.patternMode === 'ghost' ? 'bg-brand-gray text-brand-white' : 'text-neutral-500 hover:text-brand-white'}`}
+                                                    >
+                                                        <Ghost size={14} />
+                                                    </button>
+                                                </Tooltip>
+                                                <Tooltip content="Custom Color" position="bottom">
+                                                    <button
+                                                        onClick={() => updateZone(selectedItemId, { patternMode: 'custom' })}
+                                                        className={`p-1.5 rounded transition-all ${design.zones[selectedItemId]?.patternMode === 'custom' ? 'bg-brand-gray text-brand-white' : 'text-neutral-500 hover:text-brand-white'}`}
+                                                    >
+                                                        <Droplets size={14} />
+                                                    </button>
+                                                </Tooltip>
+                                            </div>
+                                        )}
+
+                                        {/* Pattern Color Trigger (only if pattern is not none AND mode is custom) */}
+                                        {design.zones[selectedItemId]?.pattern && design.zones[selectedItemId]?.pattern !== 'none' && design.zones[selectedItemId]?.patternMode === 'custom' && (
                                             <Tooltip content="Pattern Color" position="bottom">
                                                 <div className="flex items-center gap-2 border-l border-brand-border pl-3 relative">
-                                                    <span className="text-[8px] font-bold text-neutral-500 uppercase">Pattern</span>
                                                     <button
                                                         onClick={() => setActivePopover(activePopover === 'pattern' ? null : 'pattern')}
                                                         className={`w-6 h-6 rounded-full border transition-all ${activePopover === 'pattern' ? 'border-brand-accent scale-110' : 'border-brand-white/20 hover:border-brand-white'}`}
