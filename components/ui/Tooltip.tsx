@@ -32,7 +32,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 
             {children}
 
             {isVisible && !disabled && (
-                <div className={`absolute z-50 px-2 py-1 text-[11px] font-semibold tracking-wide rounded-lg shadow-lg whitespace-nowrap border ${positionClasses[position]} ${variantClasses[variant]} animate-tooltip-fade-up`}>
+                <div className={`absolute z-50 px-2 py-1 text-[11px] font-semibold tracking-wide rounded-lg shadow-lg whitespace-nowrap border ${positionClasses[position]} ${variantClasses[variant]}`}>
                     {content}
                 </div>
             )}
