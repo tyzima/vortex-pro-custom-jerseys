@@ -79,29 +79,36 @@ export const JerseySVG: React.FC<JerseySVGProps> = ({ design, view, onPositionCh
         const id = `${componentId}-pattern-${style.pattern}-${zoneKey}`;
         const isGhost = style.patternMode === 'ghost' || !style.patternMode;
         const color = isGhost ? '#000000' : style.patternColor;
+        const density = style.patternDensity || 1;
+        const rotation = style.patternRotation || 0;
+        const scale = 1 / density;
 
         if (style.pattern === 'stripes') {
+          const baseSize = 20 * scale;
           defsList.push(
-            <pattern key={id} id={id} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <rect x="0" y="0" width="10" height="20" fill={color} />
+            <pattern key={id} id={id} x="0" y="0" width={baseSize} height={baseSize} patternUnits="userSpaceOnUse" patternTransform={`rotate(${45 + rotation})`}>
+              <rect x="0" y="0" width={baseSize / 2} height={baseSize} fill={color} />
             </pattern>
           );
         } else if (style.pattern === 'dots') {
+          const baseSize = 16 * scale;
           defsList.push(
-            <pattern key={id} id={id} x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
-              <circle cx="4" cy="4" r="3" fill={color} />
-              <circle cx="12" cy="12" r="3" fill={color} />
+            <pattern key={id} id={id} x="0" y="0" width={baseSize} height={baseSize} patternUnits="userSpaceOnUse" patternTransform={`rotate(${rotation})`}>
+              <circle cx={baseSize * 0.25} cy={baseSize * 0.25} r={3 * scale} fill={color} />
+              <circle cx={baseSize * 0.75} cy={baseSize * 0.75} r={3 * scale} fill={color} />
             </pattern>
           );
         } else if (style.pattern === 'mesh') {
+          const baseSize = 8 * scale;
           defsList.push(
-            <pattern key={id} id={id} x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
-              <circle cx="4" cy="4" r="1.5" fill={color} />
+            <pattern key={id} id={id} x="0" y="0" width={baseSize} height={baseSize} patternUnits="userSpaceOnUse" patternTransform={`rotate(${rotation})`}>
+              <circle cx={baseSize / 2} cy={baseSize / 2} r={1.5 * scale} fill={color} />
             </pattern>
           );
         } else if (style.pattern === 'camo') {
+          const baseSize = 100 * scale;
           defsList.push(
-            <pattern key={id} id={id} x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+            <pattern key={id} id={id} x="0" y="0" width={baseSize} height={baseSize} patternUnits="userSpaceOnUse" patternTransform={`rotate(${rotation}) scale(${scale})`}>
               <path d="M10 10a15 15 0 0 1 20 10v10H10z" fill={color} />
               <path d="M60 60a20 20 0 0 0-20-10h-5v25z" fill={color} />
               <path d="M80 10a15 15 0 0 1-10 20v10H90z" fill={color} />
@@ -109,9 +116,10 @@ export const JerseySVG: React.FC<JerseySVGProps> = ({ design, view, onPositionCh
             </pattern>
           );
         } else if (style.pattern === 'geometric') {
+          const baseSize = 40 * scale;
           defsList.push(
-            <pattern key={id} id={id} x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M0 20 L20 0 L40 20 L20 40 Z" fill="none" stroke={color} strokeWidth="2" />
+            <pattern key={id} id={id} x="0" y="0" width={baseSize} height={baseSize} patternUnits="userSpaceOnUse" patternTransform={`rotate(${rotation})`}>
+              <path d={`M0 ${baseSize/2} L${baseSize/2} 0 L${baseSize} ${baseSize/2} L${baseSize/2} ${baseSize} Z`} fill="none" stroke={color} strokeWidth={2 * scale} />
             </pattern>
           );
         }

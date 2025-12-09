@@ -11,11 +11,11 @@ import { useTemplateLibrary } from '../contexts/TemplateLibraryContext';
 
 // Initial Default State
 const DEFAULT_ZONES: Record<string, ZoneStyle> = {
-    body: { color: '#ffffff', pattern: 'none', patternColor: '#000000', patternMode: 'ghost' },
-    trim: { color: '#0a0a0a', pattern: 'none', patternColor: '#ffffff', patternMode: 'ghost' },
-    sides: { color: '#0a0a0a', pattern: 'none', patternColor: '#ffffff', patternMode: 'ghost' },
-    shoulders: { color: '#0a0a0a', pattern: 'none', patternColor: '#ffffff', patternMode: 'ghost' },
-    chevron: { color: '#D2F802', pattern: 'none', patternColor: '#000000', patternMode: 'ghost' },
+    body: { color: '#ffffff', pattern: 'none', patternColor: '#000000', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 },
+    trim: { color: '#0a0a0a', pattern: 'none', patternColor: '#ffffff', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 },
+    sides: { color: '#0a0a0a', pattern: 'none', patternColor: '#ffffff', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 },
+    shoulders: { color: '#0a0a0a', pattern: 'none', patternColor: '#ffffff', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 },
+    chevron: { color: '#D2F802', pattern: 'none', patternColor: '#000000', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 },
 };
 
 const STEPS = [
@@ -57,11 +57,11 @@ const Thumbnail = React.memo(({ id, sport, cut, template, colors, garmentType }:
         garmentType,
         template,
         zones: {
-            body: { color: colors[0], pattern: 'none', patternColor: '#000000', patternMode: 'ghost' },
-            trim: { color: colors[1], pattern: 'none', patternColor: '#000000', patternMode: 'ghost' },
-            sides: { color: colors[1], pattern: 'none', patternColor: '#000000', patternMode: 'ghost' },
-            shoulders: { color: colors[1], pattern: 'none', patternColor: '#000000', patternMode: 'ghost' },
-            chevron: { color: colors[1], pattern: 'none', patternColor: '#000000', patternMode: 'ghost' }
+            body: { color: colors[0], pattern: 'none', patternColor: '#000000', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 },
+            trim: { color: colors[1], pattern: 'none', patternColor: '#000000', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 },
+            sides: { color: colors[1], pattern: 'none', patternColor: '#000000', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 },
+            shoulders: { color: colors[1], pattern: 'none', patternColor: '#000000', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 },
+            chevron: { color: colors[1], pattern: 'none', patternColor: '#000000', patternMode: 'ghost', patternDensity: 1, patternRotation: 0 }
         },
         textElements: [],
         logos: []
@@ -467,7 +467,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
         setDeletedItem(null);
     };
 
-    const handleZoneUpdate = (id: string, field: 'color' | 'pattern' | 'patternColor', value: string) => {
+    const handleZoneUpdate = (id: string, field: 'color' | 'pattern' | 'patternColor' | 'patternDensity' | 'patternRotation', value: string | number) => {
         setDesign(prev => ({
             ...prev,
             zones: {
@@ -1233,6 +1233,40 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Pattern Density Slider */}
+                                            <div className="space-y-2 pt-4 border-t border-brand-border">
+                                                <div className="flex items-center justify-between">
+                                                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Density</label>
+                                                    <span className="text-[10px] font-bold text-brand-white">{((design.zones[activeZoneId]?.patternDensity || 1) * 100).toFixed(0)}%</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="0.5"
+                                                    max="3"
+                                                    step="0.1"
+                                                    value={design.zones[activeZoneId]?.patternDensity || 1}
+                                                    onChange={(e) => updateZone(activeZoneId, { patternDensity: parseFloat(e.target.value) })}
+                                                    className="w-full h-1 bg-brand-gray rounded-lg appearance-none cursor-pointer accent-brand-accent"
+                                                />
+                                            </div>
+
+                                            {/* Pattern Rotation Slider */}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Rotation</label>
+                                                    <span className="text-[10px] font-bold text-brand-white">{design.zones[activeZoneId]?.patternRotation || 0}°</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="360"
+                                                    step="5"
+                                                    value={design.zones[activeZoneId]?.patternRotation || 0}
+                                                    onChange={(e) => updateZone(activeZoneId, { patternRotation: parseInt(e.target.value) })}
+                                                    className="w-full h-1 bg-brand-gray rounded-lg appearance-none cursor-pointer accent-brand-accent"
+                                                />
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -1843,7 +1877,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                         </Tooltip>
 
                                         {/* Pattern Dropdown */}
-                                        <Tooltip content="Pattern Type" position="bottom">
+                                        <Tooltip content="Pattern Type" position="bottom" disabled={activePopover === 'patternType'}>
                                             <div className="flex items-center gap-2 border-l border-brand-border pl-3 relative">
                                                 <button
                                                     onClick={() => setActivePopover(activePopover === 'patternType' ? null : 'patternType')}
@@ -1888,6 +1922,43 @@ export const Customizer: React.FC<CustomizerProps> = ({ onAddToCart, onUpdateCar
                                                         className={`w-6 h-6 rounded-full border transition-all ${activePopover === 'pattern' ? 'border-brand-accent scale-110' : 'border-brand-white/20 hover:border-brand-white'}`}
                                                         style={{ backgroundColor: design.zones[selectedItemId]?.patternColor || '#000000' }}
                                                     />
+                                                </div>
+                                            </Tooltip>
+                                        )}
+
+                                        {/* Pattern Density Slider (only if pattern is not none) */}
+                                        {design.zones[selectedItemId]?.pattern && design.zones[selectedItemId]?.pattern !== 'none' && (
+                                            <Tooltip content="Pattern Density" position="bottom">
+                                                <div className="flex items-center gap-2 border-l border-brand-border pl-3">
+                                                    <span className="text-[8px] font-bold text-neutral-500 uppercase">Den</span>
+                                                    <input
+                                                        type="range"
+                                                        min="0.5"
+                                                        max="3"
+                                                        step="0.1"
+                                                        value={design.zones[selectedItemId]?.patternDensity || 1}
+                                                        onChange={(e) => handleZoneUpdate(selectedItemId, 'patternDensity', parseFloat(e.target.value))}
+                                                        className="w-16 h-1 bg-brand-gray rounded-lg appearance-none cursor-pointer accent-brand-accent"
+                                                    />
+                                                </div>
+                                            </Tooltip>
+                                        )}
+
+                                        {/* Pattern Rotation Slider (only if pattern is not none) */}
+                                        {design.zones[selectedItemId]?.pattern && design.zones[selectedItemId]?.pattern !== 'none' && (
+                                            <Tooltip content="Pattern Rotation" position="bottom">
+                                                <div className="flex items-center gap-2 border-l border-brand-border pl-3">
+                                                    <span className="text-[8px] font-bold text-neutral-500 uppercase">Rot</span>
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max="360"
+                                                        step="5"
+                                                        value={design.zones[selectedItemId]?.patternRotation || 0}
+                                                        onChange={(e) => handleZoneUpdate(selectedItemId, 'patternRotation', parseInt(e.target.value))}
+                                                        className="w-16 h-1 bg-brand-gray rounded-lg appearance-none cursor-pointer accent-brand-accent"
+                                                    />
+                                                    <span className="text-[8px] font-bold text-brand-white w-6">{design.zones[selectedItemId]?.patternRotation || 0}°</span>
                                                 </div>
                                             </Tooltip>
                                         )}

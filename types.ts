@@ -11,7 +11,9 @@ export interface ZoneStyle {
   color: string;
   pattern: PatternType;
   patternColor: string;
-  patternMode: 'ghost' | 'custom'; // 'ghost' = darker shade of base, 'custom' = specific color
+  patternMode: 'ghost' | 'custom';
+  patternDensity: number;
+  patternRotation: number;
 }
 
 export interface Position {

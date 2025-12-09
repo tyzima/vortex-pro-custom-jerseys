@@ -5,9 +5,10 @@ interface TooltipProps {
     children: React.ReactNode;
     position?: 'top' | 'bottom' | 'left' | 'right';
     variant?: 'default' | 'danger';
+    disabled?: boolean;
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', variant = 'default' }) => {
+export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', variant = 'default', disabled = false }) => {
     const [isVisible, setIsVisible] = useState(false);
 
     const positionClasses = {
@@ -30,7 +31,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 
         >
             {children}
 
-            {isVisible && (
+            {isVisible && !disabled && (
                 <div className={`absolute z-50 px-2 py-1 text-[11px] font-semibold tracking-wide rounded-lg shadow-lg whitespace-nowrap border ${positionClasses[position]} ${variantClasses[variant]} animate-tooltip-fade-up`}>
                     {content}
                 </div>
